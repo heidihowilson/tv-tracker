@@ -1045,7 +1045,7 @@ app.post("/api/refresh-all", async (c) => {
       // If no TVMaze ID, try to find one
       if (!show.tvmaze_id) {
         const result = await tvmaze.findShow(show.title);
-        if (result && result.score > 5) {
+        if (result && result.score > 0.5) {
           db.updateShowTvmazeId(show.id, result.show.id);
           if (result.show.image?.medium) {
             db.updateShowImage(show.id, result.show.image.medium);
@@ -1087,7 +1087,7 @@ app.get("/api/refresh-all", async (c) => {
     try {
       if (!show.tvmaze_id) {
         const result = await tvmaze.findShow(show.title);
-        if (result && result.score > 5) {
+        if (result && result.score > 0.5) {
           db.updateShowTvmazeId(show.id, result.show.id);
           if (result.show.image?.medium) {
             db.updateShowImage(show.id, result.show.image.medium);
@@ -1160,7 +1160,7 @@ async function seedIfEmpty(): Promise<void> {
 
         try {
           const result = await tvmaze.findShow(show.title);
-          if (result && result.score > 5) {
+          if (result && result.score > 0.5) {
             tvmazeId = result.show.id;
             imageUrl = result.show.image?.medium ?? undefined;
           }
