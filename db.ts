@@ -15,6 +15,7 @@ export interface Show {
   status: "watching" | "completed" | "dropped" | "queued";
   added_at: string;
   notes: string | null;
+  image_url: string | null;
 }
 
 export interface Season {
@@ -74,7 +75,8 @@ export function initDb(): void {
       service TEXT,
       status TEXT NOT NULL DEFAULT 'watching' CHECK(status IN ('watching', 'completed', 'dropped', 'queued')),
       added_at TEXT NOT NULL DEFAULT (datetime('now')),
-      notes TEXT
+      notes TEXT,
+      image_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS seasons (
@@ -126,12 +128,13 @@ export function addShow(
     status?: Show["status"];
     notes?: string;
     added_at?: string;
+    image_url?: string;
   } = {}
 ): number {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT INTO shows (title, tvmaze_id, service, status, notes, added_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO shows (title, tvmaze_id, service, status, notes, added_at, image_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run(
     title,
@@ -139,7 +142,8 @@ export function addShow(
     options.service ?? null,
     options.status ?? "watching",
     options.notes ?? null,
-    options.added_at ?? new Date().toISOString()
+    options.added_at ?? new Date().toISOString(),
+    options.image_url ?? null
   );
   return db.lastInsertRowId;
 }
@@ -483,5 +487,33 @@ export function getAllProgress(): ShowProgress[] {
   return shows.map((s) => getShowProgress(s.id)!).filter(Boolean);
 }
 
+// ============ UTILITY FUNCTIONS ============
+
+export function getShowCount(): number {
+  const db = getDb();
+  const result = db.prepare("SELECT COUNT(*) as count FROM shows").get() as { count: number };
+  return result.count;
+}
+
+export function updateShowImage(id: number, imageUrl: string | null): void {
+  const db = getDb();
+  db.prepare("UPDATE shows SET image_url = ? WHERE id = ?").run(imageUrl, id);
+}
+
+// Run migrations for schema updates
+function runMigrations(): void {
+  const db = getDb();
+  
+  // Check if image_url column exists, if not add it
+  const tableInfo = db.prepare("PRAGMA table_info(shows)").all() as { name: string }[];
+  const hasImageUrl = tableInfo.some(col => col.name === "image_url");
+  
+  if (!hasImageUrl) {
+    console.log("Adding image_url column to shows table...");
+    db.exec("ALTER TABLE shows ADD COLUMN image_url TEXT");
+  }
+}
+
 // Initialize on import
 initDb();
+runMigrations();

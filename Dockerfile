@@ -6,6 +6,10 @@ WORKDIR /app
 COPY *.ts ./
 COPY deno.json ./
 
+# Copy seed data files (shows.json, history.json) if available
+# Using a shell trick to handle missing files gracefully
+COPY show[s].json histor[y].json ./
+
 # Cache dependencies
 RUN deno cache server.ts
 

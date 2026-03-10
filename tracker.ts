@@ -33,12 +33,14 @@ export async function addShowFromSearch(
     return existing;
   }
 
-  const service = options.service ?? tvmaze.getService(show);
+  const service = options.service ?? tvmaze.getService(show) ?? undefined;
+  const imageUrl = show.image?.medium ?? undefined;
   const id = db.addShow(show.name, {
     tvmaze_id: show.id,
     service,
     status: options.status ?? "watching",
     notes: options.notes,
+    image_url: imageUrl,
   });
 
   if (options.populateEpisodes !== false) {
@@ -67,13 +69,15 @@ export async function addShowById(
   }
 
   const show = await tvmaze.getShow(tvmazeId);
-  const service = options.service ?? tvmaze.getService(show);
+  const service = options.service ?? tvmaze.getService(show) ?? undefined;
+  const imageUrl = show.image?.medium ?? undefined;
 
   const id = db.addShow(show.name, {
     tvmaze_id: show.id,
     service,
     status: options.status ?? "watching",
     notes: options.notes,
+    image_url: imageUrl,
   });
 
   if (options.populateEpisodes !== false) {
@@ -94,6 +98,12 @@ export async function populateShowData(showId: number): Promise<void> {
   }
 
   console.log(`Fetching data for: ${show.title}`);
+
+  // Fetch show details to update image
+  const tvmazeShow = await tvmaze.getShow(show.tvmaze_id);
+  if (tvmazeShow.image?.medium && !show.image_url) {
+    db.updateShowImage(showId, tvmazeShow.image.medium);
+  }
 
   const seasons = await tvmaze.getSeasons(show.tvmaze_id);
   const episodes = await tvmaze.getEpisodes(show.tvmaze_id);
