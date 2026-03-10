@@ -23,6 +23,9 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days
 console.log(`API Key for cron endpoints: ${API_KEY}`);
 console.log(`Auth link: /auth/${AUTH_TOKEN}`);
 
+// Static files (icons, etc.)
+app.use("/static/*", serveStatic({ root: "./" }));
+
 // Health check endpoint (no auth)
 app.get("/health", (c) => c.text("OK"));
 
@@ -156,6 +159,13 @@ const layout = (title: string, content: string) => html`
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>${title} - TV Tracker</title>
+      <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+      <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+      <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+      <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+      <meta name="apple-mobile-web-app-capable" content="yes">
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+      <meta name="apple-mobile-web-app-title" content="TV Tracker">
       <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
       <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
       <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
