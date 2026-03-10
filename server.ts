@@ -13,18 +13,72 @@ import * as tracker from "./tracker.ts";
 
 const app = new Hono();
 
-// Auth config — device token auth
-// AUTH_TOKEN: secret token for the auth link (e.g. tv.sethgholson.com/auth/TOKEN)
-// API_KEY: separate key for cron/API endpoints
+// ============ SECURITY UTILITIES ============
+
+/** HTML-escape user-controlled strings to prevent XSS */
+function esc(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Validate URL is safe for use in href/src attributes */
+function safeUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("https://") || url.startsWith("http://")) return esc(url);
+  return "";
+}
+
+/** HMAC-SHA256 sign a value (for cookie derivation) */
+async function hmacSign(data: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Status badge class — used across multiple routes */
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case "watching": return "badge-primary";
+    case "completed": return "badge-success";
+    case "queued": return "badge-warning";
+    case "dropped": return "badge-error";
+    default: return "badge-ghost";
+  }
+}
+
+// ============ AUTH CONFIG ============
+
 const AUTH_TOKEN = Deno.env.get("AUTH_TOKEN") ?? crypto.randomUUID();
 const API_KEY = Deno.env.get("API_KEY") ?? crypto.randomUUID();
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days
 
-console.log(`API Key for cron endpoints: ${API_KEY}`);
-console.log(`Auth link: /auth/${AUTH_TOKEN}`);
+// Derive cookie value from token via HMAC (raw token never stored in cookie)
+const COOKIE_VALUE = await hmacSign("tv-tracker-auth", AUTH_TOKEN);
 
-// Static files (icons, etc.)
+if (!Deno.env.get("AUTH_TOKEN")) {
+  console.log(`[WARN] No AUTH_TOKEN env var set — generated ephemeral token.`);
+  console.log(`Auth link: /auth/${AUTH_TOKEN}`);
+}
+
+// Static files with cache headers
 app.use("/static/*", serveStatic({ root: "./" }));
+app.use("/static/*", async (c, next) => {
+  await next();
+  c.res.headers.set("Cache-Control", "public, max-age=86400, immutable");
+});
 
 // Health check endpoint (no auth)
 app.get("/health", (c) => c.text("OK"));
@@ -38,7 +92,7 @@ app.get("/auth/:token", (c) => {
 
   // Already authed? Go straight to dashboard
   const existing = getCookie(c, "tv_auth");
-  if (existing === AUTH_TOKEN) {
+  if (existing === COOKIE_VALUE) {
     return c.redirect("/");
   }
 
@@ -84,7 +138,7 @@ app.post("/auth/:token", async (c) => {
   const body = await c.req.parseBody();
   const remember = body.remember === "1";
 
-  setCookie(c, "tv_auth", AUTH_TOKEN, {
+  setCookie(c, "tv_auth", COOKIE_VALUE, {
     httpOnly: true,
     secure: true,
     sameSite: "Lax",
@@ -100,7 +154,14 @@ app.post("/auth/:token", async (c) => {
 
 // ============ PRIVATE API ROUTES (API key auth, before cookie middleware) ============
 
-function validateApiKey(c: { req: { query: (key: string) => string | undefined } }): boolean {
+function validateApiKey(c: { req: { header: (key: string) => string | undefined; query: (key: string) => string | undefined } }): boolean {
+  // Prefer Authorization header, fall back to query param for backward compat
+  const authHeader = c.req.header("Authorization");
+  if (authHeader) {
+    const bearer = authHeader.replace(/^Bearer\s+/i, "");
+    return bearer === API_KEY;
+  }
+  // Legacy: query param (deprecated, logged to warn)
   const key = c.req.query("key");
   return key === API_KEY;
 }
@@ -132,13 +193,12 @@ app.get("/api/upcoming", (c) => {
   });
 });
 
-// Auth middleware — check cookie, refresh rolling expiry
-console.log("Device token auth enabled");
+// Auth middleware — check HMAC cookie, refresh rolling expiry
 app.use("*", async (c, next) => {
   const cookie = getCookie(c, "tv_auth");
-  if (cookie === AUTH_TOKEN) {
+  if (cookie === COOKIE_VALUE) {
     // Rolling expiry — refresh on every visit
-    setCookie(c, "tv_auth", AUTH_TOKEN, {
+    setCookie(c, "tv_auth", COOKIE_VALUE, {
       httpOnly: true,
       secure: true,
       sameSite: "Lax",
@@ -163,22 +223,23 @@ app.use("*", async (c, next) => {
     const tvmazeUrl = s.tvmaze_id ? `https://www.tvmaze.com/shows/${s.tvmaze_id}` : "#";
     const progress = p && p.total > 0 ? `${p.watched}/${p.total} episodes` : "";
     const isDone = s.status === "completed";
+    const imgSrc = safeUrl(s.image_url);
     return `
-      <a href="${tvmazeUrl}" target="_blank" rel="noopener" class="group">
+      <a href="${esc(tvmazeUrl)}" target="_blank" rel="noopener" class="group">
         <div class="relative overflow-hidden rounded-xl bg-base-200 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.03]">
-          ${s.image_url
-            ? `<img src="${s.image_url}" alt="${s.title}" class="w-full aspect-[2/3] object-cover" loading="lazy">`
+          ${imgSrc
+            ? `<img src="${imgSrc}" alt="${esc(s.title)}" class="w-full aspect-[2/3] object-cover" loading="lazy">`
             : `<div class="w-full aspect-[2/3] bg-base-300 flex items-center justify-center text-4xl">📺</div>`}
           <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
           <div class="absolute bottom-0 left-0 right-0 p-3">
-            <h3 class="font-bold text-white text-sm leading-tight">${s.title}</h3>
+            <h3 class="font-bold text-white text-sm leading-tight">${esc(s.title)}</h3>
             <div class="flex items-center gap-2 mt-1">
               ${isDone
                 ? `<span class="badge badge-success badge-xs">Finished</span>`
                 : `<span class="badge badge-primary badge-xs">Watching</span>`}
               ${progress ? `<span class="text-xs text-white/60">${progress}</span>` : ""}
             </div>
-            ${s.service ? `<span class="text-xs text-white/40">${s.service}</span>` : ""}
+            ${s.service ? `<span class="text-xs text-white/40">${esc(s.service)}</span>` : ""}
           </div>
         </div>
       </a>`;
@@ -402,36 +463,26 @@ app.get("/", (c) => {
     if (show) showsMap.set(p.show_id, show);
   }
 
-  const statusBadgeClass = (status: string) => {
-    switch (status) {
-      case "watching": return "badge-primary";
-      case "completed": return "badge-success";
-      case "queued": return "badge-warning";
-      case "dropped": return "badge-error";
-      default: return "badge-ghost";
-    }
-  };
-
   const progressHtml = progress
     .map((p) => {
       const show = showsMap.get(p.show_id);
-      const imageUrl = show?.image_url;
+      const imgSrc = safeUrl(show?.image_url);
       const pct = p.total_episodes > 0 ? Math.round((p.watched_episodes / p.total_episodes) * 100) : 0;
       const next = p.next_episode
         ? `Next: S${p.next_episode.season}E${p.next_episode.episode}${
-            p.next_episode.air_date ? ` (<span class="ep-date" data-date="${p.next_episode.air_date}">${p.next_episode.air_date}</span>)` : ""
+            p.next_episode.air_date ? ` (<span class="ep-date" data-date="${esc(p.next_episode.air_date)}">${esc(p.next_episode.air_date)}</span>)` : ""
           }`
         : "Up to date";
       return `
         <a href="/show/${p.show_id}" class="card bg-base-200 shadow-sm hover:bg-base-300 transition-colors cursor-pointer no-underline">
           <div class="card-body p-4 flex-row gap-3">
-            ${imageUrl ? `<img src="${imageUrl}" alt="" class="w-16 h-24 object-cover rounded-md shrink-0 bg-base-300" loading="lazy">` : '<div class="w-16 h-24 rounded-md bg-base-300 shrink-0"></div>'}
+            ${imgSrc ? `<img src="${imgSrc}" alt="" class="w-16 h-24 object-cover rounded-md shrink-0 bg-base-300" loading="lazy">` : '<div class="w-16 h-24 rounded-md bg-base-300 shrink-0"></div>'}
             <div class="flex-1 min-w-0">
               <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
-                <h3 class="font-semibold text-sm">${p.title}</h3>
-                <span class="badge ${statusBadgeClass(p.status)} badge-sm">${p.status}</span>
+                <h3 class="font-semibold text-sm">${esc(p.title)}</h3>
+                <span class="badge ${statusBadgeClass(p.status)} badge-sm">${esc(p.status)}</span>
               </div>
-              <div class="text-xs text-base-content/60">${p.service ?? "Unknown"}${p.total_episodes > 0 ? ` · ${p.watched_episodes}/${p.total_episodes} episodes` : ""} · ${next}</div>
+              <div class="text-xs text-base-content/60">${esc(p.service ?? "Unknown")}${p.total_episodes > 0 ? ` · ${p.watched_episodes}/${p.total_episodes} episodes` : ""} · ${next}</div>
               ${p.total_episodes > 0 ? `<progress class="progress progress-primary w-full mt-2" value="${pct}" max="100"></progress>` : ""}
             </div>
           </div>
@@ -444,10 +495,10 @@ app.get("/", (c) => {
     .map(
       (ep) => `
       <div class="episode-item flex flex-wrap items-center gap-2 md:gap-4 p-3 bg-base-200 rounded-lg" id="dash-ep-${ep.show_id}-${ep.season_number}-${ep.episode_number}">
-        <span class="ep-date text-sm whitespace-nowrap" data-date="${ep.air_date}">${ep.air_date}</span>
+        <span class="ep-date text-sm whitespace-nowrap" data-date="${esc(ep.air_date)}">${esc(ep.air_date)}</span>
         <span class="font-semibold text-sm min-w-[50px]">S${ep.season_number}E${ep.episode_number}</span>
-        <span class="flex-1 min-w-[150px] text-sm"><a href="/show/${ep.show_id}" class="link link-hover">${ep.show_title}</a>${
-          ep.episode_title ? ` - ${ep.episode_title}` : ""
+        <span class="flex-1 min-w-[150px] text-sm"><a href="/show/${ep.show_id}" class="link link-hover">${esc(ep.show_title)}</a>${
+          ep.episode_title ? ` - ${esc(ep.episode_title)}` : ""
         }</span>
         <button class="btn btn-primary btn-sm watch-btn"
           data-show="${ep.show_id}" data-season="${ep.season_number}" data-episode="${ep.episode_number}"
@@ -481,11 +532,11 @@ app.get("/upcoming", (c) => {
     .map(
       (ep) => `
       <tr>
-        <td><span class="ep-date text-sm" data-date="${ep.air_date}">${ep.air_date}</span></td>
-        <td><a href="/show/${ep.show_id}" class="link link-hover">${ep.show_title}</a></td>
+        <td><span class="ep-date text-sm" data-date="${esc(ep.air_date)}">${esc(ep.air_date)}</span></td>
+        <td><a href="/show/${ep.show_id}" class="link link-hover">${esc(ep.show_title)}</a></td>
         <td>S${ep.season_number}E${ep.episode_number}</td>
-        <td>${ep.episode_title ?? ""}</td>
-        <td>${ep.service ?? ""}</td>
+        <td>${esc(ep.episode_title)}</td>
+        <td>${esc(ep.service)}</td>
       </tr>
     `
     )
@@ -532,24 +583,14 @@ app.get("/shows", (c) => {
   const status = (c.req.query("status") as db.Show["status"]) ?? undefined;
   const shows = status ? db.getShowsByStatus(status) : db.getAllShows();
 
-  const statusBadgeClass = (status: string) => {
-    switch (status) {
-      case "watching": return "badge-primary";
-      case "completed": return "badge-success";
-      case "queued": return "badge-warning";
-      case "dropped": return "badge-error";
-      default: return "badge-ghost";
-    }
-  };
-
   const showsHtml = shows
     .map(
       (s) => `
       <tr>
-        <td><a href="/show/${s.id}" class="link link-hover">${s.title}</a></td>
-        <td><span class="badge ${statusBadgeClass(s.status)} badge-sm">${s.status}</span></td>
-        <td>${s.service ?? ""}</td>
-        <td class="text-base-content/60">${s.notes ?? ""}</td>
+        <td><a href="/show/${s.id}" class="link link-hover">${esc(s.title)}</a></td>
+        <td><span class="badge ${statusBadgeClass(s.status)} badge-sm">${esc(s.status)}</span></td>
+        <td>${esc(s.service)}</td>
+        <td class="text-base-content/60">${esc(s.notes)}</td>
       </tr>
     `
     )
@@ -598,16 +639,6 @@ app.get("/show/:id", (c) => {
   const seasons = db.getSeasons(id);
   const progress = db.getShowProgress(id);
 
-  const statusBadgeClass = (status: string) => {
-    switch (status) {
-      case "watching": return "badge-primary";
-      case "completed": return "badge-success";
-      case "queued": return "badge-warning";
-      case "dropped": return "badge-error";
-      default: return "badge-ghost";
-    }
-  };
-
   const seasonsHtml = seasons
     .map((s) => {
       const episodes = db.getEpisodes(s.id);
@@ -617,8 +648,8 @@ app.get("/show/:id", (c) => {
           (e) => `
           <div class="episode-item flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-4 p-3 bg-base-300 rounded-lg ${e.watched ? "watched" : ""}" id="ep-${s.season_number}-${e.episode_number}">
             <span class="font-semibold text-sm min-w-[50px] md:min-w-[60px]">E${e.episode_number}</span>
-            <span class="flex-1 min-w-[150px] text-sm">${e.title ?? ""}</span>
-            ${e.air_date ? `<span class="ep-date text-sm whitespace-nowrap" data-date="${e.air_date}">${e.air_date}</span>` : ""}
+            <span class="flex-1 min-w-[150px] text-sm">${esc(e.title)}</span>
+            ${e.air_date ? `<span class="ep-date text-sm whitespace-nowrap" data-date="${esc(e.air_date)}">${esc(e.air_date)}</span>` : ""}
             <button class="btn btn-sm watch-btn ${e.watched ? "btn-ghost" : "btn-primary"}"
               data-show="${id}" data-season="${s.season_number}" data-episode="${e.episode_number}"
               data-watched="${e.watched ? "1" : "0"}">${e.watched ? "✕" : "✓"}</button>
@@ -641,18 +672,19 @@ app.get("/show/:id", (c) => {
     })
     .join("");
 
+  const imgSrc = safeUrl(show.image_url);
   const content = `
     <div class="flex gap-4 mb-6">
-      ${show.image_url ? `<img src="${show.image_url}" alt="" class="w-20 h-30 sm:w-24 sm:h-36 object-cover rounded-lg shrink-0 bg-base-300" loading="lazy">` : ''}
+      ${imgSrc ? `<img src="${imgSrc}" alt="" class="w-20 h-30 sm:w-24 sm:h-36 object-cover rounded-lg shrink-0 bg-base-300" loading="lazy">` : ''}
       <div class="flex-1">
         <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
           <div>
-            <h2 class="text-xl font-bold">${show.title}</h2>
-            <p class="text-sm text-base-content/60">${show.service ?? "Unknown service"} · Added ${show.added_at?.split("T")[0]}</p>
+            <h2 class="text-xl font-bold">${esc(show.title)}</h2>
+            <p class="text-sm text-base-content/60">${esc(show.service ?? "Unknown service")} · Added ${esc(show.added_at?.split("T")[0])}</p>
           </div>
-          <span class="badge ${statusBadgeClass(show.status)}">${show.status}</span>
+          <span class="badge ${statusBadgeClass(show.status)}">${esc(show.status)}</span>
         </div>
-        ${show.notes ? `<p class="text-base-content/60 text-sm mb-2">${show.notes}</p>` : ""}
+        ${show.notes ? `<p class="text-base-content/60 text-sm mb-2">${esc(show.notes)}</p>` : ""}
         <div class="flex flex-wrap gap-2">
           <form method="POST" action="/api/status" class="inline">
             <input type="hidden" name="show_id" value="${id}" />
@@ -700,14 +732,14 @@ app.get("/search", async (c) => {
         .slice(0, 15)
         .map((r) => {
           const service = tvmaze.getService(r.show) ?? "Unknown";
-          const imageUrl = r.show.image?.medium;
+          const imgSrc = safeUrl(r.show.image?.medium);
           const existing = db.getShowByTvmazeId(r.show.id);
           return `
             <div class="flex gap-3 items-center p-3 bg-base-200 rounded-lg mb-2">
-              ${imageUrl ? `<img src="${imageUrl}" alt="" class="w-12 h-18 object-cover rounded shrink-0 bg-base-300" loading="lazy">` : '<div class="w-12 h-18 rounded bg-base-300 shrink-0"></div>'}
+              ${imgSrc ? `<img src="${imgSrc}" alt="" class="w-12 h-18 object-cover rounded shrink-0 bg-base-300" loading="lazy">` : '<div class="w-12 h-18 rounded bg-base-300 shrink-0"></div>'}
               <div class="flex-1 min-w-0">
-                <strong class="text-sm">${r.show.name}</strong>
-                <div class="text-xs text-base-content/60">${service} · ${r.show.status}</div>
+                <strong class="text-sm">${esc(r.show.name)}</strong>
+                <div class="text-xs text-base-content/60">${esc(service)} · ${esc(r.show.status)}</div>
               </div>
               <div class="shrink-0">
                 ${
@@ -726,14 +758,14 @@ app.get("/search", async (c) => {
         })
         .join("");
     } catch (e) {
-      resultsHtml = `<p class="text-base-content/60">Search failed: ${e}</p>`;
+      resultsHtml = `<p class="text-base-content/60">Search failed: ${esc(String(e))}</p>`;
     }
   }
 
   const content = `
     <h2 class="text-lg font-bold mb-4">Search TVMaze</h2>
     <form method="GET" class="flex flex-col sm:flex-row gap-2 mb-6">
-      <input type="text" name="q" placeholder="Search for a show..." value="${query ?? ""}" autofocus class="input input-bordered flex-1" />
+      <input type="text" name="q" placeholder="Search for a show..." value="${esc(query ?? "")}" autofocus class="input input-bordered flex-1" />
       <button class="btn btn-primary">Search</button>
     </form>
     <div>${resultsHtml}</div>
@@ -800,15 +832,14 @@ app.post("/api/add", async (c) => {
   return c.redirect("/search");
 });
 
-// Refresh all shows from TVMaze
-app.post("/api/refresh-all", async (c) => {
+// Shared refresh-all logic
+async function refreshAllShows(): Promise<{ refreshed: number; errors: number; total: number }> {
   const shows = db.getAllShows();
   let refreshed = 0;
   let errors = 0;
 
   for (const show of shows) {
     try {
-      // If no TVMaze ID, try to find one
       if (!show.tvmaze_id) {
         const result = await tvmaze.findShow(show.title);
         if (result && result.score > 0.5) {
@@ -824,7 +855,6 @@ app.post("/api/refresh-all", async (c) => {
         await tracker.populateShowData(show.id);
         refreshed++;
       }
-      // Rate limit
       await new Promise((r) => setTimeout(r, 500));
     } catch (e) {
       console.error(`Error refreshing ${show.title}:`, e);
@@ -832,48 +862,21 @@ app.post("/api/refresh-all", async (c) => {
     }
   }
 
+  return { refreshed, errors, total: shows.length };
+}
+
+// Refresh all (authenticated UI)
+app.post("/api/refresh-all", async (c) => {
+  await refreshAllShows();
   const referer = c.req.header("Referer") ?? "/";
   return c.redirect(referer);
 });
 
-// API-key version of refresh-all (for cron/automation)
+// Refresh all (API key for cron/automation)
 app.get("/api/refresh-all", async (c) => {
-  const key = c.req.query("key");
-  const expectedKey = Deno.env.get("API_KEY");
-
-  if (!expectedKey || key !== expectedKey) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  const shows = db.getAllShows();
-  let refreshed = 0;
-  let errors = 0;
-
-  for (const show of shows) {
-    try {
-      if (!show.tvmaze_id) {
-        const result = await tvmaze.findShow(show.title);
-        if (result && result.score > 0.5) {
-          db.updateShowTvmazeId(show.id, result.show.id);
-          if (result.show.image?.medium) {
-            db.updateShowImage(show.id, result.show.image.medium);
-          }
-          show.tvmaze_id = result.show.id;
-        }
-      }
-
-      if (show.tvmaze_id) {
-        await tracker.populateShowData(show.id);
-        refreshed++;
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    } catch (e) {
-      console.error(`Error refreshing ${show.title}:`, e);
-      errors++;
-    }
-  }
-
-  return c.json({ refreshed, errors, total: shows.length });
+  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+  const result = await refreshAllShows();
+  return c.json(result);
 });
 
 // ============ STARTUP ============

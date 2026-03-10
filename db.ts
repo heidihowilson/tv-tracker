@@ -52,6 +52,7 @@ let _db: Database | null = null;
 export function getDb(): Database {
   if (!_db) {
     _db = new Database(DB_PATH);
+    _db.exec("PRAGMA journal_mode = WAL;");
     _db.exec("PRAGMA foreign_keys = ON;");
   }
   return _db;
@@ -178,12 +179,15 @@ export function updateShowStatus(id: number, status: Show["status"]): void {
   db.prepare("UPDATE shows SET status = ? WHERE id = ?").run(status, id);
 }
 
+const SHOW_COLUMNS = new Set(["title", "tvmaze_id", "service", "status", "added_at", "notes", "image_url"]);
+
 export function updateShow(id: number, updates: Partial<Omit<Show, "id">>): void {
   const db = getDb();
   const fields: string[] = [];
   const values: (string | number | null)[] = [];
 
   for (const [key, value] of Object.entries(updates)) {
+    if (!SHOW_COLUMNS.has(key)) continue; // skip unknown fields
     fields.push(`${key} = ?`);
     values.push(value as string | number | null);
   }
