@@ -13,182 +13,93 @@ import * as tracker from "./tracker.ts";
 
 const app = new Hono();
 
-// Auth config
-const authUser = Deno.env.get("AUTH_USER");
-const authPass = Deno.env.get("AUTH_PASS");
-const SESSION_SECRET = Deno.env.get("SESSION_SECRET") ?? crypto.randomUUID();
-
-// API key for cron endpoints
+// Auth config — device token auth
+// AUTH_TOKEN: secret token for the auth link (e.g. tv.sethgholson.com/auth/TOKEN)
+// API_KEY: separate key for cron/API endpoints
+const AUTH_TOKEN = Deno.env.get("AUTH_TOKEN") ?? crypto.randomUUID();
 const API_KEY = Deno.env.get("API_KEY") ?? crypto.randomUUID();
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days
+
 console.log(`API Key for cron endpoints: ${API_KEY}`);
-
-// Simple session token generator
-function makeSessionToken(user: string): string {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(user + SESSION_SECRET);
-  let hash = 0;
-  for (const b of data) {
-    hash = ((hash << 5) - hash + b) | 0;
-  }
-  return Math.abs(hash).toString(36) + "-" + Date.now().toString(36);
-}
-
-// Valid session tokens (in-memory, survives for container lifetime)
-const validSessions = new Set<string>();
+console.log(`Auth link: /auth/${AUTH_TOKEN}`);
 
 // Health check endpoint (no auth)
 app.get("/health", (c) => c.text("OK"));
 
-// Login page
-const loginPage = (error?: string) => html`
-  <!DOCTYPE html>
-  <html lang="en" data-theme="abyss">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Sign In - TV Tracker</title>
-      <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-      <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    </head>
-    <body class="min-h-screen flex items-center justify-center bg-base-100">
-      <div class="card bg-base-200 shadow-xl w-full max-w-sm">
-        <div class="card-body">
-          <h1 class="card-title text-2xl">📺 TV Tracker</h1>
-          <p class="text-base-content/60 text-sm mb-4">Sign in to continue</p>
-          ${error ? raw(`<div class="alert alert-error mb-4"><span>${error}</span></div>`) : ""}
-          <form method="POST" action="/login" class="space-y-4">
-            <div class="form-control">
-              <label class="label" for="username">
-                <span class="label-text">Username</span>
-              </label>
-              <input type="text" id="username" name="username" autocomplete="username" required autofocus class="input input-bordered w-full" />
-            </div>
-            <div class="form-control">
-              <label class="label" for="password">
-                <span class="label-text">Password</span>
-              </label>
-              <input type="password" id="password" name="password" autocomplete="current-password" required class="input input-bordered w-full" />
-            </div>
-            <button type="submit" class="btn btn-primary w-full">Sign In</button>
-          </form>
-        </div>
-      </div>
-    </body>
-  </html>
-`;
-
-// Login routes
-app.get("/login", (c) => {
-  // If already logged in, redirect to dashboard
-  const token = getCookie(c, "session");
-  if (token && validSessions.has(token)) {
-    return c.redirect("/");
+// Device token auth — tap this link once, get a 90-day rolling cookie
+app.get("/auth/:token", (c) => {
+  const token = c.req.param("token");
+  if (token !== AUTH_TOKEN) {
+    return c.text("Invalid link", 403);
   }
-  return c.html(loginPage());
-});
 
-app.post("/login", async (c) => {
-  const body = await c.req.parseBody();
-  const username = body.username as string;
-  const password = body.password as string;
+  // Set auth cookie with rolling 90-day expiry
+  setCookie(c, "tv_auth", AUTH_TOKEN, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Lax",
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+  });
 
-  if (authUser && authPass && username === authUser && password === authPass) {
-    const token = makeSessionToken(username);
-    validSessions.add(token);
-    setCookie(c, "session", token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "Lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-    });
-    // Use location.replace to avoid login page in browser history
-    return c.html(`<!DOCTYPE html>
-<html>
-<head><title>Redirecting...</title></head>
-<body>
+  // Redirect to dashboard (replace so auth link isn't in history)
+  return c.html(`<!DOCTYPE html><html><head><title>Welcome</title></head><body>
 <script>window.location.replace('/');</script>
 <noscript><meta http-equiv="refresh" content="0;url=/"></noscript>
-</body>
-</html>`);
-  }
-
-  return c.html(loginPage("Invalid username or password"), 401);
-});
-
-app.get("/logout", (c) => {
-  const token = getCookie(c, "session");
-  if (token) validSessions.delete(token);
-  deleteCookie(c, "session", { path: "/" });
-  return c.redirect("/login");
+</body></html>`);
 });
 
 // ============ PRIVATE API ROUTES (API key auth, before cookie middleware) ============
 
-// Validate API key
 function validateApiKey(c: { req: { query: (key: string) => string | undefined } }): boolean {
   const key = c.req.query("key");
   return key === API_KEY;
 }
 
-// GET /api/today - episodes airing today for tracked shows
 app.get("/api/today", (c) => {
-  if (!validateApiKey(c)) {
-    return c.json({ error: "Invalid or missing API key" }, 401);
-  }
-  
+  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
   const today = new Date().toISOString().split("T")[0];
   const episodes = db.getUpcomingEpisodes(0).filter(ep => ep.air_date === today);
-  
   return c.json({
     date: today,
     episodes: episodes.map(ep => ({
-      show: ep.show_title,
-      season: ep.season_number,
-      episode: ep.episode_number,
-      title: ep.episode_title,
-      service: ep.service,
-      air_date: ep.air_date,
+      show: ep.show_title, season: ep.season_number, episode: ep.episode_number,
+      title: ep.episode_title, service: ep.service, air_date: ep.air_date,
     })),
   });
 });
 
-// GET /api/upcoming - upcoming episodes for tracked shows
 app.get("/api/upcoming", (c) => {
-  if (!validateApiKey(c)) {
-    return c.json({ error: "Invalid or missing API key" }, 401);
-  }
-  
+  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
   const days = parseInt(c.req.query("days") ?? "7");
   const today = new Date().toISOString().split("T")[0];
   const episodes = db.getUpcomingEpisodes(days);
-  
   return c.json({
-    date: today,
-    days_ahead: days,
+    date: today, days_ahead: days,
     episodes: episodes.map(ep => ({
-      show: ep.show_title,
-      season: ep.season_number,
-      episode: ep.episode_number,
-      title: ep.episode_title,
-      service: ep.service,
-      air_date: ep.air_date,
+      show: ep.show_title, season: ep.season_number, episode: ep.episode_number,
+      title: ep.episode_title, service: ep.service, air_date: ep.air_date,
     })),
   });
 });
 
-// Auth middleware (cookie-based)
-if (authUser && authPass) {
-  console.log("Cookie auth enabled");
-  app.use("*", async (c, next) => {
-    const token = getCookie(c, "session");
-    if (token && validSessions.has(token)) {
-      return next();
-    }
-    return c.redirect("/login");
-  });
-}
+// Auth middleware — check cookie, refresh rolling expiry
+console.log("Device token auth enabled");
+app.use("*", async (c, next) => {
+  const cookie = getCookie(c, "tv_auth");
+  if (cookie === AUTH_TOKEN) {
+    // Rolling expiry — refresh on every visit
+    setCookie(c, "tv_auth", AUTH_TOKEN, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: COOKIE_MAX_AGE,
+    });
+    return next();
+  }
+  return c.text("Access denied. Use your auth link to sign in.", 403);
+});
 
 // ============ HTML TEMPLATES ============
 
@@ -222,7 +133,6 @@ const layout = (title: string, content: string) => html`
                 <li><a href="/upcoming">Upcoming</a></li>
                 <li><a href="/shows">All Shows</a></li>
                 <li><a href="/search">Add Show</a></li>
-                <li><a href="/logout" class="text-error">Sign Out</a></li>
               </ul>
             </div>
             <a href="/" class="btn btn-ghost text-xl">📺 TV Tracker</a>
@@ -236,7 +146,6 @@ const layout = (title: string, content: string) => html`
             </ul>
           </div>
           <div class="navbar-end">
-            <a href="/logout" class="btn btn-ghost btn-sm text-error hidden lg:flex">Sign Out</a>
           </div>
         </div>
         ${raw(content)}
