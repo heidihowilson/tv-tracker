@@ -147,7 +147,89 @@ app.use("*", async (c, next) => {
     });
     return next();
   }
-  return c.text("Access denied. Use your auth link to sign in.", 403);
+  // Public landing page — gallery of currently watching
+  const watching = db.getShowsByStatus("watching");
+  const completed = db.getShowsByStatus("completed");
+  const allShows = [...watching, ...completed];
+
+  const progressMap = new Map<number, { watched: number; total: number }>();
+  for (const s of allShows) {
+    const p = db.getShowProgress(s.id);
+    if (p) progressMap.set(s.id, { watched: p.watched_episodes, total: p.total_episodes });
+  }
+
+  const showCard = (s: db.Show) => {
+    const p = progressMap.get(s.id);
+    const tvmazeUrl = s.tvmaze_id ? `https://www.tvmaze.com/shows/${s.tvmaze_id}` : "#";
+    const progress = p && p.total > 0 ? `${p.watched}/${p.total} episodes` : "";
+    const isDone = s.status === "completed";
+    return `
+      <a href="${tvmazeUrl}" target="_blank" rel="noopener" class="group">
+        <div class="relative overflow-hidden rounded-xl bg-base-200 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.03]">
+          ${s.image_url
+            ? `<img src="${s.image_url}" alt="${s.title}" class="w-full aspect-[2/3] object-cover" loading="lazy">`
+            : `<div class="w-full aspect-[2/3] bg-base-300 flex items-center justify-center text-4xl">📺</div>`}
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+          <div class="absolute bottom-0 left-0 right-0 p-3">
+            <h3 class="font-bold text-white text-sm leading-tight">${s.title}</h3>
+            <div class="flex items-center gap-2 mt-1">
+              ${isDone
+                ? `<span class="badge badge-success badge-xs">Finished</span>`
+                : `<span class="badge badge-primary badge-xs">Watching</span>`}
+              ${progress ? `<span class="text-xs text-white/60">${progress}</span>` : ""}
+            </div>
+            ${s.service ? `<span class="text-xs text-white/40">${s.service}</span>` : ""}
+          </div>
+        </div>
+      </a>`;
+  };
+
+  const watchingCards = watching.map(showCard).join("");
+  const completedCards = completed.map(showCard).join("");
+
+  return c.html(`<!DOCTYPE html>
+<html lang="en" data-theme="abyss">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What We're Watching — TV Tracker</title>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="min-h-screen bg-base-100">
+  <div class="max-w-5xl mx-auto px-4 py-12">
+    <div class="text-center mb-10">
+      <h1 class="text-3xl font-bold mb-2">📺 What We're Watching</h1>
+      <p class="text-base-content/50 text-sm">A peek at our current TV rotation</p>
+    </div>
+
+    ${watching.length > 0 ? `
+    <section class="mb-12">
+      <h2 class="text-lg font-semibold text-base-content/70 mb-4">Currently Watching</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        ${watchingCards}
+      </div>
+    </section>
+    ` : ""}
+
+    ${completed.length > 0 ? `
+    <section class="mb-12">
+      <h2 class="text-lg font-semibold text-base-content/70 mb-4">Recently Finished</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        ${completedCards}
+      </div>
+    </section>
+    ` : ""}
+
+    <footer class="text-center text-base-content/30 text-xs mt-16">
+      Tracked with too much enthusiasm
+    </footer>
+  </div>
+</body>
+</html>`, 200);
 });
 
 // ============ HTML TEMPLATES ============
