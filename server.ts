@@ -534,10 +534,25 @@ const layout = (title: string, content: string) => html`
         .text-muted {
           color: var(--muted);
         }
-        .air-date {
-          color: var(--warning);
+        .ep-date {
           font-size: 0.8rem;
           white-space: nowrap;
+          color: var(--muted);
+        }
+        .ep-date.date-today {
+          color: var(--accent);
+          font-weight: 600;
+        }
+        .ep-date.date-future {
+          color: var(--warning);
+        }
+        .ep-date.date-past {
+          color: var(--muted);
+        }
+        .air-date {
+          font-size: 0.8rem;
+          white-space: nowrap;
+          color: var(--muted);
         }
         .search-results {
           margin-top: 0.75rem;
@@ -651,6 +666,74 @@ const layout = (title: string, content: string) => html`
         </header>
         ${raw(content)}
       </div>
+      <script>
+        // Color-code dates
+        function colorDates() {
+          const today = new Date().toISOString().split('T')[0];
+          document.querySelectorAll('.ep-date[data-date]').forEach(el => {
+            const d = el.dataset.date;
+            if (d === today) el.classList.add('date-today');
+            else if (d > today) el.classList.add('date-future');
+            else el.classList.add('date-past');
+          });
+        }
+        colorDates();
+
+        // Watch/unwatch via fetch (no page reload, no history entry)
+        document.addEventListener('click', async (e) => {
+          const btn = e.target.closest('.watch-btn');
+          if (!btn) return;
+          e.preventDefault();
+
+          const showId = parseInt(btn.dataset.show);
+          const season = parseInt(btn.dataset.season);
+          const episode = parseInt(btn.dataset.episode);
+          const currentlyWatched = btn.dataset.watched === '1';
+          const newWatched = !currentlyWatched;
+
+          btn.disabled = true;
+          btn.textContent = '…';
+
+          try {
+            const res = await fetch('/api/watch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ show_id: showId, season, episode, watched: newWatched }),
+            });
+
+            if (res.ok) {
+              const item = btn.closest('.episode-item');
+              if (newWatched) {
+                item.classList.add('watched');
+                btn.classList.add('secondary');
+                btn.textContent = '✕';
+                btn.dataset.watched = '1';
+              } else {
+                item.classList.remove('watched');
+                btn.classList.remove('secondary');
+                btn.textContent = '✓';
+                btn.dataset.watched = '0';
+              }
+
+              // Update season watched count if on show page
+              const card = item.closest('.card');
+              if (card) {
+                const countEl = card.querySelector('.text-muted');
+                if (countEl) {
+                  const watched = card.querySelectorAll('.episode-item.watched').length;
+                  const total = card.querySelectorAll('.episode-item').length;
+                  countEl.textContent = watched + '/' + total + ' watched';
+                }
+              }
+            } else {
+              btn.textContent = '!';
+            }
+          } catch {
+            btn.textContent = '!';
+          }
+          btn.disabled = false;
+        });
+      </script>
     </body>
   </html>
 `;
@@ -700,18 +783,15 @@ app.get("/", (c) => {
   const unwatchedHtml = unwatched
     .map(
       (ep) => `
-      <div class="episode-item">
-        <span class="air-date">${ep.air_date}</span>
+      <div class="episode-item" id="dash-ep-${ep.show_id}-${ep.season_number}-${ep.episode_number}">
+        <span class="ep-date" data-date="${ep.air_date}">${ep.air_date}</span>
         <span class="ep-num">S${ep.season_number}E${ep.episode_number}</span>
         <span class="ep-title"><a href="/show/${ep.show_id}">${ep.show_title}</a>${
           ep.episode_title ? ` - ${ep.episode_title}` : ""
         }</span>
-        <form method="POST" action="/api/watch" style="display:inline">
-          <input type="hidden" name="show_id" value="${ep.show_id}" />
-          <input type="hidden" name="season" value="${ep.season_number}" />
-          <input type="hidden" name="episode" value="${ep.episode_number}" />
-          <button class="small">✓ Watch</button>
-        </form>
+        <button class="small watch-btn"
+          data-show="${ep.show_id}" data-season="${ep.season_number}" data-episode="${ep.episode_number}"
+          data-watched="0">✓ Watch</button>
       </div>
     `
     )
@@ -741,7 +821,7 @@ app.get("/upcoming", (c) => {
     .map(
       (ep) => `
       <tr>
-        <td class="air-date">${ep.air_date}</td>
+        <td><span class="ep-date" data-date="${ep.air_date}">${ep.air_date}</span></td>
         <td><a href="/show/${ep.show_id}">${ep.show_title}</a></td>
         <td>S${ep.season_number}E${ep.episode_number}</td>
         <td>${ep.episode_title ?? ""}</td>
@@ -855,17 +935,13 @@ app.get("/show/:id", (c) => {
       const episodesHtml = episodes
         .map(
           (e) => `
-          <div class="episode-item ${e.watched ? "watched" : ""}">
+          <div class="episode-item ${e.watched ? "watched" : ""}" id="ep-${s.season_number}-${e.episode_number}">
             <span class="ep-num">E${e.episode_number}</span>
             <span class="ep-title">${e.title ?? ""}</span>
-            ${e.air_date ? `<span class="air-date">${e.air_date}</span>` : ""}
-            <form method="POST" action="/api/watch" style="display:inline">
-              <input type="hidden" name="show_id" value="${id}" />
-              <input type="hidden" name="season" value="${s.season_number}" />
-              <input type="hidden" name="episode" value="${e.episode_number}" />
-              <input type="hidden" name="watched" value="${e.watched ? "0" : "1"}" />
-              <button class="small ${e.watched ? "secondary" : ""}">${e.watched ? "✕" : "✓"}</button>
-            </form>
+            ${e.air_date ? `<span class="ep-date" data-date="${e.air_date}">${e.air_date}</span>` : ""}
+            <button class="small watch-btn ${e.watched ? "secondary" : ""}"
+              data-show="${id}" data-season="${s.season_number}" data-episode="${e.episode_number}"
+              data-watched="${e.watched ? "1" : "0"}">${e.watched ? "✕" : "✓"}</button>
           </div>
         `
         )
@@ -988,6 +1064,14 @@ app.get("/search", async (c) => {
 
 // Mark episode watched
 app.post("/api/watch", async (c) => {
+  const contentType = c.req.header("Content-Type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const body = await c.req.json();
+    db.markEpisodeWatchedByNumber(body.show_id, body.season, body.episode, body.watched);
+    return c.json({ ok: true, watched: body.watched });
+  }
+
   const body = await c.req.parseBody();
   const showId = parseInt(body.show_id as string);
   const season = parseInt(body.season as string);
