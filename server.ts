@@ -687,10 +687,10 @@ app.get("/", (c) => {
               <h3><a href="/show/${p.show_id}">${p.title}</a></h3>
               <span class="badge badge-${p.status}">${p.status}</span>
             </div>
-            <div class="meta">${p.service ?? "Unknown"} · ${p.watched_episodes}/${p.total_episodes} episodes · ${next}</div>
-            <div class="progress-bar">
+            <div class="meta">${p.service ?? "Unknown"}${p.total_episodes > 0 ? ` · ${p.watched_episodes}/${p.total_episodes} episodes` : ""} · ${next}</div>
+            ${p.total_episodes > 0 ? `<div class="progress-bar">
               <div class="progress-fill" style="width: ${pct}%"></div>
-            </div>
+            </div>` : ""}
           </div>
         </div>
       `;
@@ -913,7 +913,7 @@ app.get("/show/:id", (c) => {
       </div>
     </div>
     ${
-      progress
+      progress && progress.total_episodes > 0
         ? `
       <div class="card">
         <p>Progress: ${progress.watched_episodes}/${progress.total_episodes} episodes (${Math.round((progress.watched_episodes / progress.total_episodes) * 100)}%)</p>
@@ -922,7 +922,7 @@ app.get("/show/:id", (c) => {
         </div>
       </div>
     `
-        : ""
+        : '<div class="card"><p class="text-muted">No episode data yet — hit ↻ Refresh to pull from TVMaze</p></div>'
     }
     ${seasonsHtml}
   `;
@@ -1032,6 +1032,82 @@ app.post("/api/add", async (c) => {
     return c.redirect(`/show/${show.id}`);
   }
   return c.redirect("/search");
+});
+
+// Refresh all shows from TVMaze
+app.post("/api/refresh-all", async (c) => {
+  const shows = db.getAllShows();
+  let refreshed = 0;
+  let errors = 0;
+
+  for (const show of shows) {
+    try {
+      // If no TVMaze ID, try to find one
+      if (!show.tvmaze_id) {
+        const result = await tvmaze.findShow(show.title);
+        if (result && result.score > 5) {
+          db.updateShowTvmazeId(show.id, result.show.id);
+          if (result.show.image?.medium) {
+            db.updateShowImage(show.id, result.show.image.medium);
+          }
+          show.tvmaze_id = result.show.id;
+        }
+      }
+
+      if (show.tvmaze_id) {
+        await tracker.populateShowData(show.id);
+        refreshed++;
+      }
+      // Rate limit
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (e) {
+      console.error(`Error refreshing ${show.title}:`, e);
+      errors++;
+    }
+  }
+
+  const referer = c.req.header("Referer") ?? "/";
+  return c.redirect(referer);
+});
+
+// API-key version of refresh-all (for cron/automation)
+app.get("/api/refresh-all", async (c) => {
+  const key = c.req.query("key");
+  const expectedKey = Deno.env.get("API_KEY");
+
+  if (!expectedKey || key !== expectedKey) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const shows = db.getAllShows();
+  let refreshed = 0;
+  let errors = 0;
+
+  for (const show of shows) {
+    try {
+      if (!show.tvmaze_id) {
+        const result = await tvmaze.findShow(show.title);
+        if (result && result.score > 5) {
+          db.updateShowTvmazeId(show.id, result.show.id);
+          if (result.show.image?.medium) {
+            db.updateShowImage(show.id, result.show.image.medium);
+          }
+          show.tvmaze_id = result.show.id;
+        }
+      }
+
+      if (show.tvmaze_id) {
+        await tracker.populateShowData(show.id);
+        refreshed++;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (e) {
+      console.error(`Error refreshing ${show.title}:`, e);
+      errors++;
+    }
+  }
+
+  return c.json({ refreshed, errors, total: shows.length });
 });
 
 // ============ STARTUP ============

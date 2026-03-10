@@ -500,6 +500,11 @@ export function updateShowImage(id: number, imageUrl: string | null): void {
   db.prepare("UPDATE shows SET image_url = ? WHERE id = ?").run(imageUrl, id);
 }
 
+export function updateShowTvmazeId(id: number, tvmazeId: number): void {
+  const db = getDb();
+  db.prepare("UPDATE shows SET tvmaze_id = ? WHERE id = ?").run(tvmazeId, id);
+}
+
 // Run migrations for schema updates
 function runMigrations(): void {
   const db = getDb();
