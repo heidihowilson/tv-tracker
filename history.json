@@ -1,0 +1,58 @@
+[
+  {
+    "title": "The Burbs",
+    "season": 1,
+    "episode": 5,
+    "watchedAt": "2025-06-18",
+    "action": "watched"
+  },
+  {
+    "title": "The Pitt",
+    "season": 1,
+    "episode": 8,
+    "watchedAt": "2026-02-26",
+    "action": "watched"
+  },
+  {
+    "title": "Neighbors",
+    "season": 1,
+    "episode": 1,
+    "watchedAt": "2026-02-28",
+    "action": "watched"
+  },
+  {
+    "title": "Neighbors",
+    "season": 1,
+    "episode": 2,
+    "watchedAt": "2026-02-28",
+    "action": "watched"
+  },
+  {
+    "title": "A Knight of the Seven Kingdoms",
+    "season": 1,
+    "episodes": 6,
+    "completedAt": "2026-03-01",
+    "action": "completed"
+  },
+  {
+    "title": "Inside the CIA: Secrets & Spies",
+    "season": 1,
+    "episode": 1,
+    "watchedAt": "2026-03-02",
+    "action": "watched"
+  },
+  {
+    "title": "The Pitt",
+    "season": 1,
+    "episode": 9,
+    "watchedAt": "2026-03-05",
+    "action": "watched"
+  },
+  {
+    "title": "DTF St. Louis",
+    "season": 1,
+    "episode": 1,
+    "watchedAt": "2026-03-07",
+    "action": "watched"
+  }
+]

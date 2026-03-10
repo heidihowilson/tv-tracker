@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "migrate": "deno run -A migrate.ts",
+    "cli": "deno run -A tracker.ts",
+    "serve": "deno run -A server.ts",
+    "dev": "deno run --watch -A server.ts"
+  },
+  "imports": {
+    "@db/sqlite": "jsr:@db/sqlite@0.12",
+    "hono": "https://deno.land/x/hono@v4.3.11/mod.ts"
+  }
+}
