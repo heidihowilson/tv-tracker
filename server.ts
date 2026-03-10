@@ -13,6 +13,9 @@ import * as tracker from "./tracker.ts";
 
 const app = new Hono();
 
+// Health check endpoint (before auth)
+app.get("/health", (c) => c.text("OK"));
+
 // Basic auth if credentials are configured
 const authUser = Deno.env.get("AUTH_USER");
 const authPass = Deno.env.get("AUTH_PASS");
