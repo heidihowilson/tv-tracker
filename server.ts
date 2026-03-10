@@ -42,104 +42,36 @@ app.get("/health", (c) => c.text("OK"));
 // Login page
 const loginPage = (error?: string) => html`
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="en" data-theme="abyss">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Sign In - TV Tracker</title>
-      <style>
-        :root {
-          --bg: #0f0f0f;
-          --card: #1a1a1a;
-          --border: #333;
-          --text: #e0e0e0;
-          --muted: #888;
-          --accent: #6366f1;
-          --danger: #ef4444;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background: var(--bg);
-          color: var(--text);
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .login-card {
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          padding: 2rem;
-          width: 100%;
-          max-width: 360px;
-        }
-        .login-card h1 {
-          font-size: 1.5rem;
-          margin-bottom: 0.25rem;
-        }
-        .login-card p {
-          color: var(--muted);
-          font-size: 0.85rem;
-          margin-bottom: 1.5rem;
-        }
-        label {
-          display: block;
-          font-size: 0.85rem;
-          color: var(--muted);
-          margin-bottom: 0.25rem;
-        }
-        input[type="text"],
-        input[type="password"] {
-          width: 100%;
-          background: var(--bg);
-          border: 1px solid var(--border);
-          color: var(--text);
-          padding: 0.65rem 0.75rem;
-          border-radius: 6px;
-          font-size: 0.95rem;
-          margin-bottom: 1rem;
-        }
-        input:focus {
-          outline: none;
-          border-color: var(--accent);
-        }
-        button {
-          width: 100%;
-          background: var(--accent);
-          color: white;
-          border: none;
-          padding: 0.7rem;
-          border-radius: 6px;
-          font-size: 0.95rem;
-          font-weight: 500;
-          cursor: pointer;
-        }
-        button:hover { opacity: 0.9; }
-        .error {
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid var(--danger);
-          color: var(--danger);
-          padding: 0.5rem 0.75rem;
-          border-radius: 6px;
-          font-size: 0.85rem;
-          margin-bottom: 1rem;
-        }
-      </style>
+      <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" />
+      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     </head>
-    <body>
-      <div class="login-card">
-        <h1>📺 TV Tracker</h1>
-        <p>Sign in to continue</p>
-        ${error ? raw(`<div class="error">${error}</div>`) : ""}
-        <form method="POST" action="/login">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" autocomplete="username" required autofocus />
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" autocomplete="current-password" required />
-          <button type="submit">Sign In</button>
-        </form>
+    <body class="min-h-screen flex items-center justify-center bg-base-100">
+      <div class="card bg-base-200 shadow-xl w-full max-w-sm">
+        <div class="card-body">
+          <h1 class="card-title text-2xl">📺 TV Tracker</h1>
+          <p class="text-base-content/60 text-sm mb-4">Sign in to continue</p>
+          ${error ? raw(`<div class="alert alert-error mb-4"><span>${error}</span></div>`) : ""}
+          <form method="POST" action="/login" class="space-y-4">
+            <div class="form-control">
+              <label class="label" for="username">
+                <span class="label-text">Username</span>
+              </label>
+              <input type="text" id="username" name="username" autocomplete="username" required autofocus class="input input-bordered w-full" />
+            </div>
+            <div class="form-control">
+              <label class="label" for="password">
+                <span class="label-text">Password</span>
+              </label>
+              <input type="password" id="password" name="password" autocomplete="current-password" required class="input input-bordered w-full" />
+            </div>
+            <button type="submit" class="btn btn-primary w-full">Sign In</button>
+          </form>
+        </div>
       </div>
     </body>
   </html>
@@ -261,409 +193,50 @@ if (authUser && authPass) {
 
 const layout = (title: string, content: string) => html`
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="en" data-theme="abyss">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>${title} - TV Tracker</title>
+      <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" />
+      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
       <style>
-        :root {
-          --bg: #0f0f0f;
-          --card: #1a1a1a;
-          --border: #333;
-          --text: #e0e0e0;
-          --muted: #888;
-          --accent: #6366f1;
-          --success: #22c55e;
-          --warning: #f59e0b;
-          --danger: #ef4444;
-        }
-        * {
-          box-sizing: border-box;
-          margin: 0;
-          padding: 0;
-        }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          background: var(--bg);
-          color: var(--text);
-          line-height: 1.5;
-          min-height: 100vh;
-        }
-        a {
-          color: var(--accent);
-          text-decoration: none;
-        }
-        a:hover {
-          text-decoration: underline;
-        }
-        .container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0.75rem;
-        }
-        header {
-          border-bottom: 1px solid var(--border);
-          padding: 0.75rem 0;
-          margin-bottom: 1rem;
-        }
-        header h1 {
-          font-size: 1.25rem;
-          font-weight: 600;
-        }
-        /* Mobile-first nav */
-        nav {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem 1rem;
-          margin-top: 0.75rem;
-        }
-        nav a {
-          color: var(--muted);
-          text-decoration: none;
-          font-size: 0.9rem;
-          padding: 0.5rem 0;
-          min-height: 44px;
-          display: flex;
-          align-items: center;
-        }
-        nav a:hover,
-        nav a.active {
-          color: var(--accent);
-        }
-        nav .signout {
-          margin-left: auto;
-          color: var(--danger);
-        }
-        h2 {
-          font-size: 1.125rem;
-          margin-bottom: 0.75rem;
-        }
-        .card {
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          padding: 0.75rem;
-          margin-bottom: 0.75rem;
-        }
-        .card h3 {
-          font-size: 0.95rem;
-          margin-bottom: 0.5rem;
-        }
-        .card-with-thumb {
-          display: flex;
-          gap: 0.75rem;
-        }
-        .card-thumb {
-          width: 60px;
-          height: 90px;
-          object-fit: cover;
-          border-radius: 4px;
-          flex-shrink: 0;
-          background: var(--border);
-        }
-        .card-content {
-          flex: 1;
-          min-width: 0;
-        }
-        .badge {
-          display: inline-block;
-          padding: 0.2rem 0.5rem;
-          border-radius: 4px;
-          font-size: 0.75rem;
-          font-weight: 500;
-        }
-        .badge-watching {
-          background: var(--accent);
-        }
-        .badge-completed {
-          background: var(--success);
-        }
-        .badge-queued {
-          background: var(--warning);
-          color: #000;
-        }
-        .badge-dropped {
-          background: var(--danger);
-        }
-        .meta {
-          color: var(--muted);
-          font-size: 0.8rem;
-        }
-        .progress-bar {
-          height: 4px;
-          background: var(--border);
-          border-radius: 2px;
-          overflow: hidden;
-          margin-top: 0.5rem;
-        }
-        .progress-fill {
-          height: 100%;
-          background: var(--accent);
-          transition: width 0.3s;
-        }
-        button,
-        .btn {
-          background: var(--accent);
-          color: white;
-          border: none;
-          padding: 0.625rem 1rem;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 0.9rem;
-          text-decoration: none;
-          display: inline-block;
-          min-height: 44px;
-          min-width: 44px;
-        }
-        button:hover,
-        .btn:hover {
-          opacity: 0.9;
-        }
-        button.small,
-        .btn.small {
-          padding: 0.375rem 0.625rem;
-          font-size: 0.8rem;
-          min-height: 36px;
-          min-width: 36px;
-        }
-        button.secondary {
-          background: var(--border);
-        }
-        input,
-        select {
-          background: var(--bg);
-          border: 1px solid var(--border);
-          color: var(--text);
-          padding: 0.625rem;
-          border-radius: 4px;
-          font-size: 1rem;
-          min-height: 44px;
-        }
-        input:focus,
-        select:focus {
-          outline: none;
-          border-color: var(--accent);
-        }
-        .search-form {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          margin-bottom: 1rem;
-        }
-        .search-form input {
-          width: 100%;
-        }
-        /* Mobile-first: single column grid */
-        .grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 0.75rem;
-        }
-        /* Table wrapper for horizontal scroll on mobile */
-        .table-wrapper {
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-          margin: 0 -0.75rem;
-          padding: 0 0.75rem;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          min-width: 500px;
-        }
-        th,
-        td {
-          padding: 0.75rem 0.5rem;
-          text-align: left;
-          border-bottom: 1px solid var(--border);
-        }
-        th {
-          color: var(--muted);
-          font-weight: 500;
-          font-size: 0.8rem;
-          white-space: nowrap;
-        }
-        tr:hover {
-          background: rgba(255, 255, 255, 0.02);
-        }
-        .episode-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-        .episode-item {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.625rem;
-          background: var(--bg);
-          border-radius: 4px;
-          min-height: 44px;
-        }
-        .episode-item.watched {
-          opacity: 0.5;
-        }
-        .episode-item .ep-num {
-          font-weight: 600;
-          min-width: 50px;
-          font-size: 0.85rem;
-        }
-        .episode-item .ep-title {
-          flex: 1;
-          min-width: 150px;
-          font-size: 0.9rem;
-        }
-        .flex {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          align-items: center;
-        }
-        .flex-between {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: space-between;
-          align-items: center;
-          gap: 0.5rem;
-        }
-        .mb-1 {
-          margin-bottom: 0.75rem;
-        }
-        .text-muted {
-          color: var(--muted);
-        }
-        .ep-date {
-          font-size: 0.8rem;
-          white-space: nowrap;
-          color: var(--muted);
-        }
-        .ep-date.date-today {
-          color: var(--accent);
-          font-weight: 600;
-        }
-        .ep-date.date-future {
-          color: var(--warning);
-        }
-        .ep-date.date-past {
-          color: var(--muted);
-        }
-        .air-date {
-          font-size: 0.8rem;
-          white-space: nowrap;
-          color: var(--muted);
-        }
-        .search-results {
-          margin-top: 0.75rem;
-        }
-        .search-result {
-          display: flex;
-          gap: 0.75rem;
-          align-items: center;
-          padding: 0.75rem;
-          background: var(--bg);
-          border-radius: 4px;
-          margin-bottom: 0.5rem;
-        }
-        .search-result-thumb {
-          width: 45px;
-          height: 67px;
-          object-fit: cover;
-          border-radius: 4px;
-          flex-shrink: 0;
-          background: var(--border);
-        }
-        .search-result-info {
-          flex: 1;
-          min-width: 0;
-        }
-        .search-result-actions {
-          flex-shrink: 0;
-        }
-        .show-header {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 1rem;
-        }
-        .show-header-thumb {
-          width: 80px;
-          height: 120px;
-          object-fit: cover;
-          border-radius: 6px;
-          flex-shrink: 0;
-          background: var(--border);
-        }
-        .show-header-info {
-          flex: 1;
-        }
-        
-        /* Tablet and up */
-        @media (min-width: 640px) {
-          .container {
-            padding: 1rem;
-          }
-          header {
-            padding: 1rem 0;
-            margin-bottom: 1.5rem;
-          }
-          header h1 {
-            font-size: 1.5rem;
-          }
-          nav {
-            flex-wrap: nowrap;
-            gap: 1.5rem;
-          }
-          h2 {
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-          }
-          .card {
-            padding: 1rem;
-            margin-bottom: 1rem;
-          }
-          .search-form {
-            flex-direction: row;
-            margin-bottom: 1.5rem;
-          }
-          .search-form input {
-            flex: 1;
-            width: auto;
-          }
-          .grid {
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1rem;
-          }
-          .table-wrapper {
-            margin: 0;
-            padding: 0;
-          }
-          .episode-item {
-            flex-wrap: nowrap;
-            gap: 1rem;
-          }
-          .episode-item .ep-num {
-            min-width: 60px;
-          }
-          .show-header-thumb {
-            width: 100px;
-            height: 150px;
-          }
-        }
+        .episode-item.watched { opacity: 0.5; }
       </style>
     </head>
-    <body>
-      <div class="container">
-        <header>
-          <h1>📺 TV Tracker</h1>
-          <nav>
-            <a href="/">Dashboard</a>
-            <a href="/upcoming">Upcoming</a>
-            <a href="/shows">All Shows</a>
-            <a href="/search">Add Show</a>
-            <a href="/logout" class="signout">Sign Out</a>
-          </nav>
-        </header>
+    <body class="min-h-screen bg-base-100">
+      <div class="container mx-auto px-3 py-3 max-w-6xl">
+        <!-- Navbar -->
+        <div class="navbar bg-base-200 rounded-box mb-6">
+          <div class="navbar-start">
+            <div class="dropdown">
+              <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
+                </svg>
+              </div>
+              <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-200 rounded-box z-10 mt-3 w-52 p-2 shadow">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/upcoming">Upcoming</a></li>
+                <li><a href="/shows">All Shows</a></li>
+                <li><a href="/search">Add Show</a></li>
+                <li><a href="/logout" class="text-error">Sign Out</a></li>
+              </ul>
+            </div>
+            <a href="/" class="btn btn-ghost text-xl">📺 TV Tracker</a>
+          </div>
+          <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1">
+              <li><a href="/">Dashboard</a></li>
+              <li><a href="/upcoming">Upcoming</a></li>
+              <li><a href="/shows">All Shows</a></li>
+              <li><a href="/search">Add Show</a></li>
+            </ul>
+          </div>
+          <div class="navbar-end">
+            <a href="/logout" class="btn btn-ghost btn-sm text-error hidden lg:flex">Sign Out</a>
+          </div>
+        </div>
         ${raw(content)}
       </div>
       <script>
@@ -672,9 +245,14 @@ const layout = (title: string, content: string) => html`
           const today = new Date().toISOString().split('T')[0];
           document.querySelectorAll('.ep-date[data-date]').forEach(el => {
             const d = el.dataset.date;
-            if (d === today) el.classList.add('date-today');
-            else if (d > today) el.classList.add('date-future');
-            else el.classList.add('date-past');
+            el.classList.remove('text-base-content/50', 'text-primary', 'font-semibold', 'text-warning');
+            if (d === today) {
+              el.classList.add('text-primary', 'font-semibold');
+            } else if (d > today) {
+              el.classList.add('text-warning');
+            } else {
+              el.classList.add('text-base-content/50');
+            }
           });
         }
         colorDates();
@@ -705,12 +283,14 @@ const layout = (title: string, content: string) => html`
               const item = btn.closest('.episode-item');
               if (newWatched) {
                 item.classList.add('watched');
-                btn.classList.add('secondary');
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-ghost');
                 btn.textContent = '✕';
                 btn.dataset.watched = '1';
               } else {
                 item.classList.remove('watched');
-                btn.classList.remove('secondary');
+                btn.classList.remove('btn-ghost');
+                btn.classList.add('btn-primary');
                 btn.textContent = '✓';
                 btn.dataset.watched = '0';
               }
@@ -718,7 +298,7 @@ const layout = (title: string, content: string) => html`
               // Update season watched count if on show page
               const card = item.closest('.card');
               if (card) {
-                const countEl = card.querySelector('.text-muted');
+                const countEl = card.querySelector('.watched-count');
                 if (countEl) {
                   const watched = card.querySelectorAll('.episode-item.watched').length;
                   const total = card.querySelectorAll('.episode-item').length;
@@ -752,6 +332,16 @@ app.get("/", (c) => {
     if (show) showsMap.set(p.show_id, show);
   }
 
+  const statusBadgeClass = (status: string) => {
+    switch (status) {
+      case "watching": return "badge-primary";
+      case "completed": return "badge-success";
+      case "queued": return "badge-warning";
+      case "dropped": return "badge-error";
+      default: return "badge-ghost";
+    }
+  };
+
   const progressHtml = progress
     .map((p) => {
       const show = showsMap.get(p.show_id);
@@ -763,17 +353,17 @@ app.get("/", (c) => {
           }`
         : "Up to date";
       return `
-        <div class="card card-with-thumb">
-          ${imageUrl ? `<img src="${imageUrl}" alt="" class="card-thumb" loading="lazy">` : '<div class="card-thumb"></div>'}
-          <div class="card-content">
-            <div class="flex-between mb-1">
-              <h3><a href="/show/${p.show_id}">${p.title}</a></h3>
-              <span class="badge badge-${p.status}">${p.status}</span>
+        <div class="card bg-base-200 shadow-sm">
+          <div class="card-body p-4 flex-row gap-3">
+            ${imageUrl ? `<img src="${imageUrl}" alt="" class="w-16 h-24 object-cover rounded-md shrink-0 bg-base-300" loading="lazy">` : '<div class="w-16 h-24 rounded-md bg-base-300 shrink-0"></div>'}
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
+                <h3 class="font-semibold text-sm"><a href="/show/${p.show_id}" class="link link-hover">${p.title}</a></h3>
+                <span class="badge ${statusBadgeClass(p.status)} badge-sm">${p.status}</span>
+              </div>
+              <div class="text-xs text-base-content/60">${p.service ?? "Unknown"}${p.total_episodes > 0 ? ` · ${p.watched_episodes}/${p.total_episodes} episodes` : ""} · ${next}</div>
+              ${p.total_episodes > 0 ? `<progress class="progress progress-primary w-full mt-2" value="${pct}" max="100"></progress>` : ""}
             </div>
-            <div class="meta">${p.service ?? "Unknown"}${p.total_episodes > 0 ? ` · ${p.watched_episodes}/${p.total_episodes} episodes` : ""} · ${next}</div>
-            ${p.total_episodes > 0 ? `<div class="progress-bar">
-              <div class="progress-fill" style="width: ${pct}%"></div>
-            </div>` : ""}
           </div>
         </div>
       `;
@@ -783,13 +373,13 @@ app.get("/", (c) => {
   const unwatchedHtml = unwatched
     .map(
       (ep) => `
-      <div class="episode-item" id="dash-ep-${ep.show_id}-${ep.season_number}-${ep.episode_number}">
-        <span class="ep-date" data-date="${ep.air_date}">${ep.air_date}</span>
-        <span class="ep-num">S${ep.season_number}E${ep.episode_number}</span>
-        <span class="ep-title"><a href="/show/${ep.show_id}">${ep.show_title}</a>${
+      <div class="episode-item flex flex-wrap items-center gap-2 md:gap-4 p-3 bg-base-200 rounded-lg" id="dash-ep-${ep.show_id}-${ep.season_number}-${ep.episode_number}">
+        <span class="ep-date text-sm whitespace-nowrap" data-date="${ep.air_date}">${ep.air_date}</span>
+        <span class="font-semibold text-sm min-w-[50px]">S${ep.season_number}E${ep.episode_number}</span>
+        <span class="flex-1 min-w-[150px] text-sm"><a href="/show/${ep.show_id}" class="link link-hover">${ep.show_title}</a>${
           ep.episode_title ? ` - ${ep.episode_title}` : ""
         }</span>
-        <button class="small watch-btn"
+        <button class="btn btn-primary btn-sm watch-btn"
           data-show="${ep.show_id}" data-season="${ep.season_number}" data-episode="${ep.episode_number}"
           data-watched="0">✓ Watch</button>
       </div>
@@ -798,14 +388,14 @@ app.get("/", (c) => {
     .join("");
 
   const content = `
-    <h2>Currently Watching</h2>
-    ${progress.length === 0 ? '<p class="text-muted">No shows being watched</p>' : `<div class="grid">${progressHtml}</div>`}
+    <h2 class="text-lg font-bold mb-4">Currently Watching</h2>
+    ${progress.length === 0 ? '<p class="text-base-content/60">No shows being watched</p>' : `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${progressHtml}</div>`}
     
-    <h2 style="margin-top: 2rem">Ready to Watch</h2>
+    <h2 class="text-lg font-bold mb-4 mt-8">Ready to Watch</h2>
     ${
       unwatched.length === 0
-        ? '<p class="text-muted">All caught up!</p>'
-        : `<div class="episode-list">${unwatchedHtml}</div>`
+        ? '<p class="text-base-content/60">All caught up!</p>'
+        : `<div class="flex flex-col gap-2">${unwatchedHtml}</div>`
     }
   `;
 
@@ -821,8 +411,8 @@ app.get("/upcoming", (c) => {
     .map(
       (ep) => `
       <tr>
-        <td><span class="ep-date" data-date="${ep.air_date}">${ep.air_date}</span></td>
-        <td><a href="/show/${ep.show_id}">${ep.show_title}</a></td>
+        <td><span class="ep-date text-sm" data-date="${ep.air_date}">${ep.air_date}</span></td>
+        <td><a href="/show/${ep.show_id}" class="link link-hover">${ep.show_title}</a></td>
         <td>S${ep.season_number}E${ep.episode_number}</td>
         <td>${ep.episode_title ?? ""}</td>
         <td>${ep.service ?? ""}</td>
@@ -832,10 +422,10 @@ app.get("/upcoming", (c) => {
     .join("");
 
   const content = `
-    <div class="flex-between mb-1">
-      <h2>Upcoming Episodes</h2>
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <h2 class="text-lg font-bold">Upcoming Episodes</h2>
       <form method="GET">
-        <select name="days" onchange="this.form.submit()">
+        <select name="days" onchange="this.form.submit()" class="select select-bordered select-sm">
           <option value="7" ${days === 7 ? "selected" : ""}>7 days</option>
           <option value="14" ${days === 14 ? "selected" : ""}>14 days</option>
           <option value="30" ${days === 30 ? "selected" : ""}>30 days</option>
@@ -844,10 +434,10 @@ app.get("/upcoming", (c) => {
     </div>
     ${
       upcoming.length === 0
-        ? '<p class="text-muted">No upcoming episodes</p>'
+        ? '<p class="text-base-content/60">No upcoming episodes</p>'
         : `
-      <div class="table-wrapper">
-        <table>
+      <div class="overflow-x-auto">
+        <table class="table table-zebra">
           <thead>
             <tr>
               <th>Air Date</th>
@@ -872,24 +462,34 @@ app.get("/shows", (c) => {
   const status = (c.req.query("status") as db.Show["status"]) ?? undefined;
   const shows = status ? db.getShowsByStatus(status) : db.getAllShows();
 
+  const statusBadgeClass = (status: string) => {
+    switch (status) {
+      case "watching": return "badge-primary";
+      case "completed": return "badge-success";
+      case "queued": return "badge-warning";
+      case "dropped": return "badge-error";
+      default: return "badge-ghost";
+    }
+  };
+
   const showsHtml = shows
     .map(
       (s) => `
       <tr>
-        <td><a href="/show/${s.id}">${s.title}</a></td>
-        <td><span class="badge badge-${s.status}">${s.status}</span></td>
+        <td><a href="/show/${s.id}" class="link link-hover">${s.title}</a></td>
+        <td><span class="badge ${statusBadgeClass(s.status)} badge-sm">${s.status}</span></td>
         <td>${s.service ?? ""}</td>
-        <td class="text-muted">${s.notes ?? ""}</td>
+        <td class="text-base-content/60">${s.notes ?? ""}</td>
       </tr>
     `
     )
     .join("");
 
   const content = `
-    <div class="flex-between mb-1">
-      <h2>All Shows (${shows.length})</h2>
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <h2 class="text-lg font-bold">All Shows (${shows.length})</h2>
       <form method="GET">
-        <select name="status" onchange="this.form.submit()">
+        <select name="status" onchange="this.form.submit()" class="select select-bordered select-sm">
           <option value="">All</option>
           <option value="watching" ${status === "watching" ? "selected" : ""}>Watching</option>
           <option value="completed" ${status === "completed" ? "selected" : ""}>Completed</option>
@@ -898,8 +498,8 @@ app.get("/shows", (c) => {
         </select>
       </form>
     </div>
-    <div class="table-wrapper">
-      <table>
+    <div class="overflow-x-auto">
+      <table class="table table-zebra">
         <thead>
           <tr>
             <th>Title</th>
@@ -922,11 +522,21 @@ app.get("/show/:id", (c) => {
   const show = db.getShow(id);
 
   if (!show) {
-    return c.html(layout("Not Found", '<p class="text-muted">Show not found</p>'));
+    return c.html(layout("Not Found", '<p class="text-base-content/60">Show not found</p>'));
   }
 
   const seasons = db.getSeasons(id);
   const progress = db.getShowProgress(id);
+
+  const statusBadgeClass = (status: string) => {
+    switch (status) {
+      case "watching": return "badge-primary";
+      case "completed": return "badge-success";
+      case "queued": return "badge-warning";
+      case "dropped": return "badge-error";
+      default: return "badge-ghost";
+    }
+  };
 
   const seasonsHtml = seasons
     .map((s) => {
@@ -935,11 +545,11 @@ app.get("/show/:id", (c) => {
       const episodesHtml = episodes
         .map(
           (e) => `
-          <div class="episode-item ${e.watched ? "watched" : ""}" id="ep-${s.season_number}-${e.episode_number}">
-            <span class="ep-num">E${e.episode_number}</span>
-            <span class="ep-title">${e.title ?? ""}</span>
-            ${e.air_date ? `<span class="ep-date" data-date="${e.air_date}">${e.air_date}</span>` : ""}
-            <button class="small watch-btn ${e.watched ? "secondary" : ""}"
+          <div class="episode-item flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-4 p-3 bg-base-300 rounded-lg ${e.watched ? "watched" : ""}" id="ep-${s.season_number}-${e.episode_number}">
+            <span class="font-semibold text-sm min-w-[50px] md:min-w-[60px]">E${e.episode_number}</span>
+            <span class="flex-1 min-w-[150px] text-sm">${e.title ?? ""}</span>
+            ${e.air_date ? `<span class="ep-date text-sm whitespace-nowrap" data-date="${e.air_date}">${e.air_date}</span>` : ""}
+            <button class="btn btn-sm watch-btn ${e.watched ? "btn-ghost" : "btn-primary"}"
               data-show="${id}" data-season="${s.season_number}" data-episode="${e.episode_number}"
               data-watched="${e.watched ? "1" : "0"}">${e.watched ? "✕" : "✓"}</button>
           </div>
@@ -948,42 +558,44 @@ app.get("/show/:id", (c) => {
         .join("");
 
       return `
-        <div class="card">
-          <div class="flex-between mb-1">
-            <h3>Season ${s.season_number}</h3>
-            <span class="text-muted">${watchedCount}/${episodes.length} watched</span>
+        <div class="card bg-base-200 shadow-sm mb-4">
+          <div class="card-body p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h3 class="card-title text-base">Season ${s.season_number}</h3>
+              <span class="text-base-content/60 text-sm watched-count">${watchedCount}/${episodes.length} watched</span>
+            </div>
+            <div class="flex flex-col gap-2">${episodesHtml}</div>
           </div>
-          <div class="episode-list">${episodesHtml}</div>
         </div>
       `;
     })
     .join("");
 
   const content = `
-    <div class="show-header">
-      ${show.image_url ? `<img src="${show.image_url}" alt="" class="show-header-thumb" loading="lazy">` : ''}
-      <div class="show-header-info">
-        <div class="flex-between mb-1">
+    <div class="flex gap-4 mb-6">
+      ${show.image_url ? `<img src="${show.image_url}" alt="" class="w-20 h-30 sm:w-24 sm:h-36 object-cover rounded-lg shrink-0 bg-base-300" loading="lazy">` : ''}
+      <div class="flex-1">
+        <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
           <div>
-            <h2>${show.title}</h2>
-            <p class="meta">${show.service ?? "Unknown service"} · Added ${show.added_at?.split("T")[0]}</p>
+            <h2 class="text-xl font-bold">${show.title}</h2>
+            <p class="text-sm text-base-content/60">${show.service ?? "Unknown service"} · Added ${show.added_at?.split("T")[0]}</p>
           </div>
-          <span class="badge badge-${show.status}">${show.status}</span>
+          <span class="badge ${statusBadgeClass(show.status)}">${show.status}</span>
         </div>
-        ${show.notes ? `<p class="text-muted mb-1">${show.notes}</p>` : ""}
-        <div class="flex">
-          <form method="POST" action="/api/status" style="display:inline">
+        ${show.notes ? `<p class="text-base-content/60 text-sm mb-2">${show.notes}</p>` : ""}
+        <div class="flex flex-wrap gap-2">
+          <form method="POST" action="/api/status" class="inline">
             <input type="hidden" name="show_id" value="${id}" />
-            <select name="status" onchange="this.form.submit()">
+            <select name="status" onchange="this.form.submit()" class="select select-bordered select-sm">
               <option value="watching" ${show.status === "watching" ? "selected" : ""}>Watching</option>
               <option value="completed" ${show.status === "completed" ? "selected" : ""}>Completed</option>
               <option value="queued" ${show.status === "queued" ? "selected" : ""}>Queued</option>
               <option value="dropped" ${show.status === "dropped" ? "selected" : ""}>Dropped</option>
             </select>
           </form>
-          <form method="POST" action="/api/refresh" style="display:inline">
+          <form method="POST" action="/api/refresh" class="inline">
             <input type="hidden" name="show_id" value="${id}" />
-            <button class="small secondary">↻ Refresh</button>
+            <button class="btn btn-ghost btn-sm">↻ Refresh</button>
           </form>
         </div>
       </div>
@@ -991,14 +603,14 @@ app.get("/show/:id", (c) => {
     ${
       progress && progress.total_episodes > 0
         ? `
-      <div class="card">
-        <p>Progress: ${progress.watched_episodes}/${progress.total_episodes} episodes (${Math.round((progress.watched_episodes / progress.total_episodes) * 100)}%)</p>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width: ${(progress.watched_episodes / progress.total_episodes) * 100}%"></div>
+      <div class="card bg-base-200 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <p class="text-sm">Progress: ${progress.watched_episodes}/${progress.total_episodes} episodes (${Math.round((progress.watched_episodes / progress.total_episodes) * 100)}%)</p>
+          <progress class="progress progress-primary w-full mt-2" value="${progress.watched_episodes}" max="${progress.total_episodes}"></progress>
         </div>
       </div>
     `
-        : '<div class="card"><p class="text-muted">No episode data yet — hit ↻ Refresh to pull from TVMaze</p></div>'
+        : '<div class="card bg-base-200 shadow-sm mb-4"><div class="card-body p-4"><p class="text-base-content/60">No episode data yet — hit ↻ Refresh to pull from TVMaze</p></div></div>'
     }
     ${seasonsHtml}
   `;
@@ -1021,20 +633,20 @@ app.get("/search", async (c) => {
           const imageUrl = r.show.image?.medium;
           const existing = db.getShowByTvmazeId(r.show.id);
           return `
-            <div class="search-result">
-              ${imageUrl ? `<img src="${imageUrl}" alt="" class="search-result-thumb" loading="lazy">` : '<div class="search-result-thumb"></div>'}
-              <div class="search-result-info">
-                <strong>${r.show.name}</strong>
-                <div class="text-muted">${service} · ${r.show.status}</div>
+            <div class="flex gap-3 items-center p-3 bg-base-200 rounded-lg mb-2">
+              ${imageUrl ? `<img src="${imageUrl}" alt="" class="w-12 h-18 object-cover rounded shrink-0 bg-base-300" loading="lazy">` : '<div class="w-12 h-18 rounded bg-base-300 shrink-0"></div>'}
+              <div class="flex-1 min-w-0">
+                <strong class="text-sm">${r.show.name}</strong>
+                <div class="text-xs text-base-content/60">${service} · ${r.show.status}</div>
               </div>
-              <div class="search-result-actions">
+              <div class="shrink-0">
                 ${
                   existing
-                    ? `<a href="/show/${existing.id}" class="btn small secondary">View</a>`
+                    ? `<a href="/show/${existing.id}" class="btn btn-ghost btn-sm">View</a>`
                     : `
                     <form method="POST" action="/api/add">
                       <input type="hidden" name="tvmaze_id" value="${r.show.id}" />
-                      <button class="small">+ Add</button>
+                      <button class="btn btn-primary btn-sm">+ Add</button>
                     </form>
                   `
                 }
@@ -1044,17 +656,17 @@ app.get("/search", async (c) => {
         })
         .join("");
     } catch (e) {
-      resultsHtml = `<p class="text-muted">Search failed: ${e}</p>`;
+      resultsHtml = `<p class="text-base-content/60">Search failed: ${e}</p>`;
     }
   }
 
   const content = `
-    <h2>Search TVMaze</h2>
-    <form method="GET" class="search-form">
-      <input type="text" name="q" placeholder="Search for a show..." value="${query ?? ""}" autofocus />
-      <button>Search</button>
+    <h2 class="text-lg font-bold mb-4">Search TVMaze</h2>
+    <form method="GET" class="flex flex-col sm:flex-row gap-2 mb-6">
+      <input type="text" name="q" placeholder="Search for a show..." value="${query ?? ""}" autofocus class="input input-bordered flex-1" />
+      <button class="btn btn-primary">Search</button>
     </form>
-    <div class="search-results">${resultsHtml}</div>
+    <div>${resultsHtml}</div>
   `;
 
   return c.html(layout("Add Show", content));
