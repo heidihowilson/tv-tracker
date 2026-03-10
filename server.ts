@@ -26,23 +26,69 @@ console.log(`Auth link: /auth/${AUTH_TOKEN}`);
 // Health check endpoint (no auth)
 app.get("/health", (c) => c.text("OK"));
 
-// Device token auth — tap this link once, get a 90-day rolling cookie
+// Device token auth — interstitial then cookie
 app.get("/auth/:token", (c) => {
   const token = c.req.param("token");
   if (token !== AUTH_TOKEN) {
     return c.text("Invalid link", 403);
   }
 
-  // Set auth cookie with rolling 90-day expiry
+  // Already authed? Go straight to dashboard
+  const existing = getCookie(c, "tv_auth");
+  if (existing === AUTH_TOKEN) {
+    return c.redirect("/");
+  }
+
+  // Show interstitial
+  return c.html(`<!DOCTYPE html>
+<html lang="en" data-theme="abyss">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome — TV Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-base-100 p-4">
+  <div class="card bg-base-200 shadow-xl w-full max-w-sm">
+    <div class="card-body">
+      <h1 class="card-title text-2xl">📺 TV Tracker</h1>
+      <p class="text-base-content/60 text-sm mt-2">
+        This link gives you access to the family TV tracker. Once authorized, you can browse shows, mark episodes as watched, and see what's coming up.
+      </p>
+      <div class="divider my-2"></div>
+      <form method="POST" action="/auth/${token}">
+        <label class="flex items-center gap-3 cursor-pointer mb-4">
+          <input type="checkbox" name="remember" value="1" checked class="checkbox checkbox-primary checkbox-sm" />
+          <span class="text-sm">Remember this device for 90 days</span>
+        </label>
+        <button type="submit" class="btn btn-primary w-full">Continue</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
+// POST handler — actually set the cookie
+app.post("/auth/:token", async (c) => {
+  const token = c.req.param("token");
+  if (token !== AUTH_TOKEN) {
+    return c.text("Invalid link", 403);
+  }
+
+  const body = await c.req.parseBody();
+  const remember = body.remember === "1";
+
   setCookie(c, "tv_auth", AUTH_TOKEN, {
     httpOnly: true,
     secure: true,
     sameSite: "Lax",
     path: "/",
-    maxAge: COOKIE_MAX_AGE,
+    maxAge: remember ? COOKIE_MAX_AGE : undefined, // session cookie if unchecked
   });
 
-  // Redirect to dashboard (replace so auth link isn't in history)
   return c.html(`<!DOCTYPE html><html><head><title>Welcome</title></head><body>
 <script>window.location.replace('/');</script>
 <noscript><meta http-equiv="refresh" content="0;url=/"></noscript>
