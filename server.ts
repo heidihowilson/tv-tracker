@@ -6,30 +6,182 @@
 import { Hono } from "https://deno.land/x/hono@v4.3.11/mod.ts";
 import { html, raw } from "https://deno.land/x/hono@v4.3.11/helper/html/index.ts";
 import { serveStatic } from "https://deno.land/x/hono@v4.3.11/middleware.ts";
-import { basicAuth } from "https://deno.land/x/hono@v4.3.11/middleware/basic-auth/index.ts";
+import { getCookie, setCookie, deleteCookie } from "https://deno.land/x/hono@v4.3.11/helper/cookie/index.ts";
 import * as db from "./db.ts";
 import * as tvmaze from "./tvmaze.ts";
 import * as tracker from "./tracker.ts";
 
 const app = new Hono();
 
-// Health check endpoint (before auth)
-app.get("/health", (c) => c.text("OK"));
-
-// Basic auth if credentials are configured
+// Auth config
 const authUser = Deno.env.get("AUTH_USER");
 const authPass = Deno.env.get("AUTH_PASS");
+const SESSION_SECRET = Deno.env.get("SESSION_SECRET") ?? crypto.randomUUID();
 
+// Simple session token generator
+function makeSessionToken(user: string): string {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(user + SESSION_SECRET);
+  let hash = 0;
+  for (const b of data) {
+    hash = ((hash << 5) - hash + b) | 0;
+  }
+  return Math.abs(hash).toString(36) + "-" + Date.now().toString(36);
+}
+
+// Valid session tokens (in-memory, survives for container lifetime)
+const validSessions = new Set<string>();
+
+// Health check endpoint (no auth)
+app.get("/health", (c) => c.text("OK"));
+
+// Login page
+const loginPage = (error?: string) => html`
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Sign In - TV Tracker</title>
+      <style>
+        :root {
+          --bg: #0f0f0f;
+          --card: #1a1a1a;
+          --border: #333;
+          --text: #e0e0e0;
+          --muted: #888;
+          --accent: #6366f1;
+          --danger: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background: var(--bg);
+          color: var(--text);
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .login-card {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 2rem;
+          width: 100%;
+          max-width: 360px;
+        }
+        .login-card h1 {
+          font-size: 1.5rem;
+          margin-bottom: 0.25rem;
+        }
+        .login-card p {
+          color: var(--muted);
+          font-size: 0.85rem;
+          margin-bottom: 1.5rem;
+        }
+        label {
+          display: block;
+          font-size: 0.85rem;
+          color: var(--muted);
+          margin-bottom: 0.25rem;
+        }
+        input[type="text"],
+        input[type="password"] {
+          width: 100%;
+          background: var(--bg);
+          border: 1px solid var(--border);
+          color: var(--text);
+          padding: 0.65rem 0.75rem;
+          border-radius: 6px;
+          font-size: 0.95rem;
+          margin-bottom: 1rem;
+        }
+        input:focus {
+          outline: none;
+          border-color: var(--accent);
+        }
+        button {
+          width: 100%;
+          background: var(--accent);
+          color: white;
+          border: none;
+          padding: 0.7rem;
+          border-radius: 6px;
+          font-size: 0.95rem;
+          font-weight: 500;
+          cursor: pointer;
+        }
+        button:hover { opacity: 0.9; }
+        .error {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid var(--danger);
+          color: var(--danger);
+          padding: 0.5rem 0.75rem;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          margin-bottom: 1rem;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="login-card">
+        <h1>📺 TV Tracker</h1>
+        <p>Sign in to continue</p>
+        ${error ? raw(`<div class="error">${error}</div>`) : ""}
+        <form method="POST" action="/login">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" autocomplete="username" required autofocus />
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required />
+          <button type="submit">Sign In</button>
+        </form>
+      </div>
+    </body>
+  </html>
+`;
+
+// Login routes
+app.get("/login", (c) => c.html(loginPage()));
+
+app.post("/login", async (c) => {
+  const body = await c.req.parseBody();
+  const username = body.username as string;
+  const password = body.password as string;
+
+  if (authUser && authPass && username === authUser && password === authPass) {
+    const token = makeSessionToken(username);
+    validSessions.add(token);
+    setCookie(c, "session", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+    return c.redirect("/");
+  }
+
+  return c.html(loginPage("Invalid username or password"), 401);
+});
+
+app.get("/logout", (c) => {
+  const token = getCookie(c, "session");
+  if (token) validSessions.delete(token);
+  deleteCookie(c, "session", { path: "/" });
+  return c.redirect("/login");
+});
+
+// Auth middleware (cookie-based)
 if (authUser && authPass) {
-  console.log("Basic auth enabled");
-  app.use(
-    "*",
-    basicAuth({
-      username: authUser,
-      password: authPass,
-      realm: "TV Tracker",
-    })
-  );
+  console.log("Cookie auth enabled");
+  app.use("*", async (c, next) => {
+    const token = getCookie(c, "session");
+    if (token && validSessions.has(token)) {
+      return next();
+    }
+    return c.redirect("/login");
+  });
 }
 
 // ============ HTML TEMPLATES ============
@@ -279,6 +431,7 @@ const layout = (title: string, content: string) => html`
             <a href="/upcoming">Upcoming</a>
             <a href="/shows">All Shows</a>
             <a href="/search">Add Show</a>
+            <a href="/logout" style="margin-left:auto; color:var(--danger)">Sign Out</a>
           </nav>
         </header>
         ${raw(content)}
