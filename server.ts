@@ -242,11 +242,32 @@ const layout = (title: string, content: string) => html`
         ${raw(content)}
       </div>
       <script>
-        // Color-code dates
-        function colorDates() {
+        // Relative date formatting
+        function relativeDate(dateStr) {
+          const d = new Date(dateStr + 'T00:00:00');
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          const diffMs = target - today;
+          const diffDays = Math.round(diffMs / 86400000);
+
+          if (diffDays === 0) return 'Today';
+          if (diffDays === 1) return 'Tomorrow';
+          if (diffDays === -1) return 'Yesterday';
+          if (diffDays > 1 && diffDays <= 6) return d.toLocaleDateString('en-US', { weekday: 'long' });
+          if (diffDays < 0 && diffDays >= -6) return Math.abs(diffDays) + 'd ago';
+          if (diffDays < -6 && diffDays >= -30) return Math.abs(Math.round(diffDays / 7)) + 'w ago';
+          if (diffDays > 6 && diffDays <= 30) return 'In ' + Math.round(diffDays / 7) + 'w';
+          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        // Color-code and format dates
+        function formatDates() {
           const today = new Date().toISOString().split('T')[0];
           document.querySelectorAll('.ep-date[data-date]').forEach(el => {
             const d = el.dataset.date;
+            el.textContent = relativeDate(d);
+            el.title = d; // tooltip shows actual date
             el.classList.remove('text-base-content/50', 'text-primary', 'font-semibold', 'text-warning');
             if (d === today) {
               el.classList.add('text-primary', 'font-semibold');
@@ -257,7 +278,7 @@ const layout = (title: string, content: string) => html`
             }
           });
         }
-        colorDates();
+        formatDates();
 
         // Watch/unwatch via fetch (no page reload, no history entry)
         document.addEventListener('click', async (e) => {
@@ -351,23 +372,23 @@ app.get("/", (c) => {
       const pct = p.total_episodes > 0 ? Math.round((p.watched_episodes / p.total_episodes) * 100) : 0;
       const next = p.next_episode
         ? `Next: S${p.next_episode.season}E${p.next_episode.episode}${
-            p.next_episode.air_date ? ` (${p.next_episode.air_date})` : ""
+            p.next_episode.air_date ? ` (<span class="ep-date" data-date="${p.next_episode.air_date}">${p.next_episode.air_date}</span>)` : ""
           }`
         : "Up to date";
       return `
-        <div class="card bg-base-200 shadow-sm">
+        <a href="/show/${p.show_id}" class="card bg-base-200 shadow-sm hover:bg-base-300 transition-colors cursor-pointer no-underline">
           <div class="card-body p-4 flex-row gap-3">
             ${imageUrl ? `<img src="${imageUrl}" alt="" class="w-16 h-24 object-cover rounded-md shrink-0 bg-base-300" loading="lazy">` : '<div class="w-16 h-24 rounded-md bg-base-300 shrink-0"></div>'}
             <div class="flex-1 min-w-0">
               <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
-                <h3 class="font-semibold text-sm"><a href="/show/${p.show_id}" class="link link-hover">${p.title}</a></h3>
+                <h3 class="font-semibold text-sm">${p.title}</h3>
                 <span class="badge ${statusBadgeClass(p.status)} badge-sm">${p.status}</span>
               </div>
               <div class="text-xs text-base-content/60">${p.service ?? "Unknown"}${p.total_episodes > 0 ? ` · ${p.watched_episodes}/${p.total_episodes} episodes` : ""} · ${next}</div>
               ${p.total_episodes > 0 ? `<progress class="progress progress-primary w-full mt-2" value="${pct}" max="100"></progress>` : ""}
             </div>
           </div>
-        </div>
+        </a>
       `;
     })
     .join("");
