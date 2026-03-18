@@ -314,40 +314,54 @@ const layout = (title: string, content: string) => html`
       <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
       <style>
         .episode-item.watched { opacity: 0.5; }
+        .btm-nav { padding-bottom: env(safe-area-inset-bottom, 0); }
       </style>
     </head>
-    <body class="min-h-screen bg-base-100">
-      <div class="container mx-auto px-3 py-3 max-w-6xl">
-        <!-- Navbar -->
-        <div class="navbar bg-base-200 rounded-box mb-6">
-          <div class="navbar-start">
-            <div class="dropdown">
-              <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
-                </svg>
-              </div>
-              <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-200 rounded-box z-10 mt-3 w-52 p-2 shadow">
-                <li><a href="/">Dashboard</a></li>
-                <li><a href="/upcoming">Upcoming</a></li>
-                <li><a href="/shows">All Shows</a></li>
-                <li><a href="/search">Add Show</a></li>
-              </ul>
-            </div>
-            <a href="/" class="btn btn-ghost text-xl">📺 TV Tracker</a>
-          </div>
-          <div class="navbar-center hidden lg:flex">
-            <ul class="menu menu-horizontal px-1">
-              <li><a href="/">Dashboard</a></li>
-              <li><a href="/upcoming">Upcoming</a></li>
-              <li><a href="/shows">All Shows</a></li>
-              <li><a href="/search">Add Show</a></li>
-            </ul>
-          </div>
-          <div class="navbar-end">
+    <body class="min-h-screen bg-base-100 pb-20 lg:pb-0">
+      <!-- Desktop top nav -->
+      <div class="hidden lg:block sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
+        <div class="container mx-auto max-w-6xl px-4 flex items-center h-14">
+          <a href="/" class="font-bold text-lg mr-8">📺 TV Tracker</a>
+          <nav class="flex gap-1">
+            <a href="/" class="btn btn-ghost btn-sm">Home</a>
+            <a href="/upcoming" class="btn btn-ghost btn-sm">Upcoming</a>
+            <a href="/shows" class="btn btn-ghost btn-sm">All Shows</a>
+          </nav>
+          <div class="ml-auto">
+            <a href="/search" class="btn btn-primary btn-sm">+ Add Show</a>
           </div>
         </div>
+      </div>
+
+      <!-- Mobile header -->
+      <div class="lg:hidden sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
+        <div class="flex items-center justify-center h-12 px-4">
+          <a href="/" class="font-bold text-lg">📺 TV Tracker</a>
+        </div>
+      </div>
+
+      <div class="container mx-auto px-3 py-4 max-w-6xl">
         ${raw(content)}
+      </div>
+
+      <!-- Mobile bottom nav -->
+      <div class="btm-nav btm-nav-sm lg:hidden bg-base-200 border-t border-base-300 z-40">
+        <a href="/" class="text-base-content/70 hover:text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <span class="btm-nav-label text-xs">Home</span>
+        </a>
+        <a href="/upcoming" class="text-base-content/70 hover:text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span class="btm-nav-label text-xs">Upcoming</span>
+        </a>
+        <a href="/search" class="text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          <span class="btm-nav-label text-xs font-semibold">Add</span>
+        </a>
+        <a href="/shows" class="text-base-content/70 hover:text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+          <span class="btm-nav-label text-xs">Shows</span>
+        </a>
       </div>
       <script>
         // Relative date formatting
@@ -509,15 +523,15 @@ app.get("/", (c) => {
     .join("");
 
   const content = `
-    <h2 class="text-lg font-bold mb-4">Currently Watching</h2>
-    ${progress.length === 0 ? '<p class="text-base-content/60">No shows being watched</p>' : `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${progressHtml}</div>`}
-    
-    <h2 class="text-lg font-bold mb-4 mt-8">Ready to Watch</h2>
+    <h2 class="text-lg font-bold mb-4">What to Watch Next</h2>
     ${
       unwatched.length === 0
-        ? '<p class="text-base-content/60">All caught up!</p>'
+        ? '<p class="text-base-content/60">All caught up! 🎉</p>'
         : `<div class="flex flex-col gap-2">${unwatchedHtml}</div>`
     }
+    
+    <h2 class="text-lg font-bold mb-4 mt-8">Currently Watching</h2>
+    ${progress.length === 0 ? '<p class="text-base-content/60">No shows being tracked</p>' : `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${progressHtml}</div>`}
   `;
 
   return c.html(layout("Dashboard", content));
