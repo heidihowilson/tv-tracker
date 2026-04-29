@@ -193,6 +193,12 @@ app.get("/api/upcoming", (c) => {
   });
 });
 
+app.get("/api/refresh-all", async (c) => {
+  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+  const result = await refreshAllShows();
+  return c.json(result);
+});
+
 // Auth middleware — check HMAC cookie, refresh rolling expiry
 app.use("*", async (c, next) => {
   const cookie = getCookie(c, "tv_auth");
@@ -974,12 +980,6 @@ app.post("/api/refresh-all", async (c) => {
   return c.redirect(referer);
 });
 
-// Refresh all (API key for cron/automation)
-app.get("/api/refresh-all", async (c) => {
-  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
-  const result = await refreshAllShows();
-  return c.json(result);
-});
 
 // ============ STARTUP ============
 
