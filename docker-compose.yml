@@ -1,8 +1,10 @@
 services:
   tv-tracker:
     build: .
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    networks:
+      - coolify
     volumes:
       - tv-tracker-data:/data
     environment:
@@ -21,4 +23,8 @@ services:
 
 volumes:
   tv-tracker-data:
+    external: true
+
+networks:
+  coolify:
     external: true
