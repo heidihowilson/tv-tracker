@@ -1,0 +1,24 @@
+services:
+  tv-tracker:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - tv-tracker-data:/data
+    environment:
+      - DB_PATH=/data/tracker.db
+      - PORT=8000
+      - AUTH_TOKEN=${AUTH_TOKEN}
+      - API_KEY=${API_KEY}
+      - SESSION_SECRET=${SESSION_SECRET}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  tv-tracker-data:
+    external: true
