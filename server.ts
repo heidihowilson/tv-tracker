@@ -478,6 +478,67 @@ const layout = (title: string, content: string) => html`
           }
           btn.disabled = false;
         });
+
+        // Mark all episodes in a season watched/unwatched
+        document.addEventListener('click', async (e) => {
+          const btn = e.target.closest('.season-watch-all-btn');
+          if (!btn) return;
+          e.preventDefault();
+
+          const showId = parseInt(btn.dataset.show);
+          const season = parseInt(btn.dataset.season);
+          const currentlyAllWatched = btn.dataset.watched === '1';
+          const newWatched = !currentlyAllWatched;
+
+          btn.disabled = true;
+          btn.textContent = '…';
+
+          const card = btn.closest('.card');
+          const episodeBtns = card ? card.querySelectorAll('.watch-btn') : [];
+          const requests = Array.from(episodeBtns).map(epBtn => {
+            const ep = parseInt(epBtn.dataset.episode);
+            return fetch('/api/watch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ show_id: showId, season, episode: ep, watched: newWatched }),
+            });
+          });
+
+          try {
+            await Promise.all(requests);
+            // Update each episode row
+            episodeBtns.forEach(epBtn => {
+              const item = epBtn.closest('.episode-item');
+              if (newWatched) {
+                item.classList.add('watched');
+                epBtn.classList.remove('btn-primary');
+                epBtn.classList.add('btn-ghost');
+                epBtn.textContent = '✕';
+                epBtn.dataset.watched = '1';
+              } else {
+                item.classList.remove('watched');
+                epBtn.classList.remove('btn-ghost');
+                epBtn.classList.add('btn-primary');
+                epBtn.textContent = '✓';
+                epBtn.dataset.watched = '0';
+              }
+            });
+            // Update count and button state
+            const countEl = card ? card.querySelector('.watched-count') : null;
+            if (countEl) {
+              const total = episodeBtns.length;
+              countEl.textContent = (newWatched ? total : 0) + '/' + total + ' watched';
+            }
+            btn.textContent = newWatched ? 'Unmark all' : 'Mark all';
+            btn.dataset.watched = newWatched ? '1' : '0';
+            btn.classList.toggle('btn-outline', !newWatched);
+            btn.classList.toggle('btn-primary', !newWatched);
+            btn.classList.toggle('btn-ghost', newWatched);
+          } catch {
+            btn.textContent = '!';
+          }
+          btn.disabled = false;
+        });
       </script>
     </body>
   </html>
@@ -692,12 +753,19 @@ app.get("/show/:id", (c) => {
         )
         .join("");
 
+      const allWatched = watchedCount === episodes.length && episodes.length > 0;
       return `
         <div class="card bg-base-200 shadow-sm mb-4">
           <div class="card-body p-4">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h3 class="card-title text-base">Season ${s.season_number}</h3>
-              <span class="text-base-content/60 text-sm watched-count">${watchedCount}/${episodes.length} watched</span>
+              <div class="flex items-center gap-2">
+                <span class="text-base-content/60 text-sm watched-count">${watchedCount}/${episodes.length} watched</span>
+                ${episodes.length > 0 ? `<button class="btn btn-xs season-watch-all-btn ${allWatched ? "btn-ghost" : "btn-outline btn-primary"}"
+                  data-show="${id}" data-season="${s.season_number}" data-watched="${allWatched ? "1" : "0"}">
+                  ${allWatched ? "Unmark all" : "Mark all"}
+                </button>` : ""}
+              </div>
             </div>
             <div class="flex flex-col gap-2">${episodesHtml}</div>
           </div>
