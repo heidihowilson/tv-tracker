@@ -873,8 +873,8 @@ app.get("/search", async (c) => {
   const content = `
     <h2 class="text-lg font-bold mb-4">Search TVMaze</h2>
     <form method="GET" class="flex flex-col sm:flex-row gap-2 mb-6">
-      <input type="text" name="q" placeholder="Search for a show..." value="${esc(query ?? "")}" autofocus class="input input-bordered flex-1" />
-      <button class="btn btn-primary">Search</button>
+      <input type="text" name="q" placeholder="Search for a show..." value="${esc(query ?? "")}" autofocus inputmode="search" autocomplete="off" autocapitalize="words" class="input input-bordered input-lg flex-1 text-base" />
+      <button class="btn btn-primary btn-lg">Search</button>
     </form>
     <div>${resultsHtml}</div>
   `;
