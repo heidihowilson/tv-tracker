@@ -335,6 +335,7 @@ export interface UpcomingEpisode {
   episode_title: string | null;
   air_date: string;
   service: string | null;
+  image_url: string | null;
 }
 
 export function getUpcomingEpisodes(daysAhead: number = 14): UpcomingEpisode[] {
@@ -352,7 +353,8 @@ export function getUpcomingEpisodes(daysAhead: number = 14): UpcomingEpisode[] {
       e.episode_number,
       e.title as episode_title,
       e.air_date,
-      sh.service
+      sh.service,
+      sh.image_url
     FROM episodes e
     JOIN seasons se ON e.season_id = se.id
     JOIN shows sh ON se.show_id = sh.id
@@ -380,7 +382,8 @@ export function getRecentlyAired(daysBehind: number = 7): UpcomingEpisode[] {
       e.episode_number,
       e.title as episode_title,
       e.air_date,
-      sh.service
+      sh.service,
+      sh.image_url
     FROM episodes e
     JOIN seasons se ON e.season_id = se.id
     JOIN shows sh ON se.show_id = sh.id

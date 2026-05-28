@@ -624,23 +624,68 @@ app.get("/", (c) => {
   return c.html(layout("Dashboard", content));
 });
 
-// Upcoming episodes
+// Upcoming episodes — grouped into relative-week buckets with thumbnails
 app.get("/upcoming", (c) => {
-  const days = parseInt(c.req.query("days") ?? "14");
+  const days = parseInt(c.req.query("days") ?? "30");
   const upcoming = db.getUpcomingEpisodes(days);
 
-  const upcomingHtml = upcoming
-    .map(
-      (ep) => `
-      <tr>
-        <td><span class="ep-date text-sm" data-date="${esc(ep.air_date)}">${esc(ep.air_date)}</span></td>
-        <td><a href="/show/${ep.show_id}" class="link link-hover">${esc(ep.show_title)}</a></td>
-        <td>S${ep.season_number}E${ep.episode_number}</td>
-        <td>${esc(ep.episode_title)}</td>
-        <td>${esc(ep.service)}</td>
-      </tr>
-    `
-    )
+  const today = new Date();
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+  const weekLabel = (w: number): string => {
+    if (w === 0) return "This week";
+    if (w === 1) return "Next week";
+    return `In ${w} weeks`;
+  };
+
+  const groups = new Map<number, typeof upcoming>();
+  for (const ep of upcoming) {
+    const ad = new Date(ep.air_date + "T00:00:00");
+    const adMid = new Date(ad.getFullYear(), ad.getMonth(), ad.getDate()).getTime();
+    const diffDays = Math.round((adMid - todayMid) / 86400000);
+    const week = Math.max(0, Math.floor(diffDays / 7));
+    if (!groups.has(week)) groups.set(week, []);
+    groups.get(week)!.push(ep);
+  }
+
+  const sortedWeeks = [...groups.keys()].sort((a, b) => a - b);
+
+  const groupsHtml = sortedWeeks
+    .map((w) => {
+      const eps = groups.get(w)!;
+      const cardsHtml = eps
+        .map((ep) => {
+          const imgSrc = safeUrl(ep.image_url);
+          return `
+            <a href="/show/${ep.show_id}" class="card bg-base-200 shadow-sm hover:bg-base-300 transition-colors no-underline">
+              <div class="card-body p-3 flex-row gap-3 items-center">
+                ${
+                  imgSrc
+                    ? `<img src="${imgSrc}" alt="" class="w-14 h-20 sm:w-16 sm:h-24 object-cover rounded-md shrink-0 bg-base-300" loading="lazy">`
+                    : `<div class="w-14 h-20 sm:w-16 sm:h-24 rounded-md bg-base-300 shrink-0 flex items-center justify-center text-2xl">📺</div>`
+                }
+                <div class="flex-1 min-w-0">
+                  <h3 class="font-semibold text-sm truncate">${esc(ep.show_title)}</h3>
+                  <p class="text-xs text-base-content/60 truncate">S${ep.season_number}E${ep.episode_number}${
+                    ep.episode_title ? ` · ${esc(ep.episode_title)}` : ""
+                  }</p>
+                  <div class="flex items-center gap-2 mt-1 flex-wrap">
+                    <span class="ep-date text-xs" data-date="${esc(ep.air_date)}">${esc(ep.air_date)}</span>
+                    ${ep.service ? `<span class="text-xs text-base-content/40">· ${esc(ep.service)}</span>` : ""}
+                  </div>
+                </div>
+              </div>
+            </a>
+          `;
+        })
+        .join("");
+      return `
+        <section class="mb-6">
+          <h3 class="text-base font-bold text-base-content/70 mb-3">${weekLabel(w)} <span class="text-base-content/40 font-normal">(${eps.length})</span></h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">${cardsHtml}</div>
+        </section>
+      `;
+    })
     .join("");
 
   const content = `
@@ -651,29 +696,11 @@ app.get("/upcoming", (c) => {
           <option value="7" ${days === 7 ? "selected" : ""}>7 days</option>
           <option value="14" ${days === 14 ? "selected" : ""}>14 days</option>
           <option value="30" ${days === 30 ? "selected" : ""}>30 days</option>
+          <option value="60" ${days === 60 ? "selected" : ""}>60 days</option>
         </select>
       </form>
     </div>
-    ${
-      upcoming.length === 0
-        ? '<p class="text-base-content/60">No upcoming episodes</p>'
-        : `
-      <div class="overflow-x-auto">
-        <table class="table table-zebra">
-          <thead>
-            <tr>
-              <th>Air Date</th>
-              <th>Show</th>
-              <th>Episode</th>
-              <th>Title</th>
-              <th>Service</th>
-            </tr>
-          </thead>
-          <tbody>${upcomingHtml}</tbody>
-        </table>
-      </div>
-    `
-    }
+    ${upcoming.length === 0 ? '<p class="text-base-content/60">No upcoming episodes</p>' : groupsHtml}
   `;
 
   return c.html(layout("Upcoming", content));
