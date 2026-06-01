@@ -3,9 +3,12 @@
  * SQLite backend for show/episode tracking
  */
 
-import { Database } from "jsr:@db/sqlite@0.12";
+import Database from "better-sqlite3";
+import { fileURLToPath } from "node:url";
 
-const DB_PATH = Deno.env.get("DB_PATH") ?? new URL("./tracker.db", import.meta.url).pathname;
+const DB_PATH = process.env.DB_PATH ?? fileURLToPath(new URL("./tracker.db", import.meta.url));
+
+type Database = InstanceType<typeof Database>;
 
 export interface Show {
   id: number;
@@ -137,7 +140,7 @@ export function addShow(
     INSERT INTO shows (title, tvmaze_id, service, status, notes, added_at, image_url)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  stmt.run(
+  const info = stmt.run(
     title,
     options.tvmaze_id ?? null,
     options.service ?? null,
@@ -146,7 +149,7 @@ export function addShow(
     options.added_at ?? new Date().toISOString(),
     options.image_url ?? null
   );
-  return db.lastInsertRowId;
+  return Number(info.lastInsertRowid);
 }
 
 export function getShow(id: number): Show | undefined {
@@ -219,14 +222,14 @@ export function addSeason(
       premiered = COALESCE(excluded.premiered, premiered),
       ended = COALESCE(excluded.ended, ended)
   `);
-  stmt.run(
+  const info = stmt.run(
     showId,
     seasonNumber,
     options.episode_count ?? null,
     options.premiered ?? null,
     options.ended ?? null
   );
-  return db.lastInsertRowId;
+  return Number(info.lastInsertRowid);
 }
 
 export function getSeason(showId: number, seasonNumber: number): Season | undefined {
@@ -257,8 +260,8 @@ export function addEpisode(
       air_date = COALESCE(excluded.air_date, air_date),
       runtime = COALESCE(excluded.runtime, runtime)
   `);
-  stmt.run(seasonId, episodeNumber, options.title ?? null, options.air_date ?? null, options.runtime ?? null);
-  return db.lastInsertRowId;
+  const info = stmt.run(seasonId, episodeNumber, options.title ?? null, options.air_date ?? null, options.runtime ?? null);
+  return Number(info.lastInsertRowid);
 }
 
 export function getEpisode(seasonId: number, episodeNumber: number): Episode | undefined {
@@ -410,14 +413,14 @@ export function addWatchHistory(entry: {
     INSERT INTO watch_history (episode_id, show_id, watched_at, action, notes)
     VALUES (?, ?, ?, ?, ?)
   `);
-  stmt.run(
+  const info = stmt.run(
     entry.episode_id ?? null,
     entry.show_id ?? null,
     entry.watched_at ?? new Date().toISOString(),
     entry.action,
     entry.notes ?? null
   );
-  return db.lastInsertRowId;
+  return Number(info.lastInsertRowid);
 }
 
 export function getWatchHistory(limit: number = 50): WatchHistory[] {

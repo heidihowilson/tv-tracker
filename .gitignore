@@ -1,0 +1,4 @@
+node_modules/
+*.log
+tracker.db-wal
+tracker.db-shm

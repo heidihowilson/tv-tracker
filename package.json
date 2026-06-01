@@ -1,0 +1,30 @@
+{
+  "name": "tv-tracker",
+  "version": "1.0.0",
+  "description": "SQLite-backed TV show tracking system with TVMaze integration",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "migrate": "tsx migrate.ts",
+    "cli": "tsx tracker.ts",
+    "serve": "tsx server.ts",
+    "dev": "tsx watch server.ts",
+    "test:e2e": "tsx e2e.spec.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@remix-run/fetch-router": "^0.19.1",
+    "@remix-run/form-data-parser": "^0.17.2",
+    "@remix-run/node-fetch-server": "^0.13.3",
+    "@remix-run/ui": "^0.2.0",
+    "better-sqlite3": "^11.8.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "playwright": "^1.60.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

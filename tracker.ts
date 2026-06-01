@@ -5,6 +5,7 @@
 
 import * as db from "./db.ts";
 import * as tvmaze from "./tvmaze.ts";
+import { fileURLToPath } from "node:url";
 
 // ============ HIGH-LEVEL OPERATIONS ============
 
@@ -256,7 +257,7 @@ export async function search(query: string): Promise<tvmaze.SearchResult[]> {
 // ============ CLI ============
 
 async function cli() {
-  const args = Deno.args;
+  const args = process.argv.slice(2);
   const command = args[0];
 
   switch (command) {
@@ -478,6 +479,6 @@ Commands:
 }
 
 // Run CLI if executed directly
-if (import.meta.main) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await cli();
 }
