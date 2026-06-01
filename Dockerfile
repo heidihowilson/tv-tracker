@@ -16,7 +16,10 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Application code
+# Application code. tsconfig.json is REQUIRED at runtime: tsx/esbuild reads
+# `jsxImportSource: "@remix-run/ui"` from it to compile JSX to the Remix runtime
+# (without it, JSX falls back to React.createElement and the views crash).
+COPY tsconfig.json ./
 COPY *.ts *.tsx ./
 COPY static ./static
 

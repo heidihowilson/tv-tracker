@@ -1,5 +1,13 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource @remix-run/ui */
 /**
  * TV Tracker views — @remix-run/ui (Remix 3) JSX, server-rendered to HTML strings.
+ *
+ * NOTE: the JSX-source pragma on the first line is load-bearing — it tells esbuild/tsx to
+ * compile JSX to the Remix runtime even if tsconfig.json isn't present (e.g. a misconfigured
+ * container). Without it JSX falls back to React.createElement and every view throws
+ * "React is not defined". (Do not repeat the literal pragma token in prose — esbuild scans all
+ * comments for it and would use the following word as the import source.)
  *
  * Notes on @remix-run/ui 0.2.0:
  *  - Plain `(props) => <jsx>` functions can't be used as JSX *tags* (the runtime expects a
