@@ -6,59 +6,59 @@ SQLite-backed TV show tracking system with TVMaze integration.
 
 ```bash
 # Run migration (import existing shows.json/history.json)
-deno task migrate
+npm run migrate
 
 # Start web UI
-deno task serve      # http://localhost:8000
+npm run serve      # http://localhost:8000
 
 # Or use the CLI
-deno task cli <command>
+npm run cli -- <command>
 ```
 
 ## CLI Commands
 
 ```bash
 # Add a show from TVMaze search
-deno task cli add "The Pitt"
+npm run cli -- add "The Pitt"
 
 # Search TVMaze without adding
-deno task cli search "breaking bad"
+npm run cli -- search "breaking bad"
 
 # Mark episode as watched
-deno task cli watch "The Pitt" S01E05
-deno task cli watch "The Pitt" 1 5
+npm run cli -- watch "The Pitt" S01E05
+npm run cli -- watch "The Pitt" 1 5
 
 # Mark all episodes through S1E5 as watched
-deno task cli watched-through "The Pitt" 1 5
+npm run cli -- watched-through "The Pitt" 1 5
 
 # Change show status
-deno task cli status "The Pitt" completed
+npm run cli -- status "The Pitt" completed
 
 # View upcoming episodes (next 14 days by default)
-deno task cli upcoming
-deno task cli upcoming 30
+npm run cli -- upcoming
+npm run cli -- upcoming 30
 
 # View unwatched episodes (last 7 days by default)
-deno task cli unwatched
+npm run cli -- unwatched
 
 # View watching progress
-deno task cli progress
+npm run cli -- progress
 
 # List shows by status
-deno task cli list watching
-deno task cli list queued
+npm run cli -- list watching
+npm run cli -- list queued
 
 # Refresh episode data from TVMaze
-deno task cli refresh "The Pitt"
-deno task cli refresh  # refresh all
+npm run cli -- refresh "The Pitt"
+npm run cli -- refresh  # refresh all
 
 # Show detailed info
-deno task cli info "The Pitt"
+npm run cli -- info "The Pitt"
 ```
 
 ## Web UI
 
-Start with `deno task serve` (or `deno task dev` for auto-reload).
+Start with `npm run serve` (or `npm run dev` for auto-reload).
 
 Features:
 - Dashboard with watching progress and unwatched episodes

@@ -1,37 +1,70 @@
 /**
  * TV Tracker Web UI
- * Simple Hono server for managing shows
+ * Remix 3 (fetch-router) server. Views rendered via @remix-run/ui (see views.tsx).
  */
 
-import { Hono } from "https://deno.land/x/hono@v4.3.11/mod.ts";
-import { html, raw } from "https://deno.land/x/hono@v4.3.11/helper/html/index.ts";
-import { serveStatic } from "https://deno.land/x/hono@v4.3.11/middleware.ts";
-import { getCookie, setCookie, deleteCookie } from "https://deno.land/x/hono@v4.3.11/helper/cookie/index.ts";
+import * as http from "node:http";
+import { readFile } from "node:fs/promises";
+import { join, normalize } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createRouter } from "@remix-run/fetch-router";
+import type { Middleware } from "@remix-run/fetch-router";
+import { createRequestListener } from "@remix-run/node-fetch-server";
+import { parseFormData } from "@remix-run/form-data-parser";
 import * as db from "./db.ts";
 import * as tvmaze from "./tvmaze.ts";
 import * as tracker from "./tracker.ts";
+import * as views from "./views.tsx";
 
-const app = new Hono();
+// ============ RESPONSE HELPERS ============
 
-// ============ SECURITY UTILITIES ============
-
-/** HTML-escape user-controlled strings to prevent XSS */
-function esc(s: string | null | undefined): string {
-  if (!s) return "";
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+/** Build an HTML response with the right content type */
+function html(body: string, status = 200, headers: Record<string, string> = {}): Response {
+  return new Response(body, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8", ...headers },
+  });
 }
 
-/** Validate URL is safe for use in href/src attributes */
-function safeUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  if (url.startsWith("https://") || url.startsWith("http://")) return esc(url);
-  return "";
+/** Build a 302 redirect response */
+function redirect(location: string): Response {
+  return new Response(null, { status: 302, headers: { Location: location } });
 }
+
+// ============ COOKIE HELPERS ============
+
+interface CookieOpts {
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "Strict" | "Lax" | "None";
+  path?: string;
+  maxAge?: number;
+}
+
+/** Read a single cookie value from a request's Cookie header */
+function getCookieValue(req: Request, name: string): string | null {
+  const header = req.headers.get("Cookie");
+  if (!header) return null;
+  for (const part of header.split(/;\s*/)) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq) === name) return decodeURIComponent(part.slice(eq + 1));
+  }
+  return null;
+}
+
+/** Serialize a Set-Cookie header value */
+function serializeCookie(name: string, value: string, opts: CookieOpts = {}): string {
+  let str = `${name}=${encodeURIComponent(value)}`;
+  if (opts.maxAge !== undefined) str += `; Max-Age=${opts.maxAge}`;
+  str += `; Path=${opts.path ?? "/"}`;
+  if (opts.sameSite) str += `; SameSite=${opts.sameSite}`;
+  if (opts.secure) str += `; Secure`;
+  if (opts.httpOnly) str += `; HttpOnly`;
+  return str;
+}
+
+// ============ HMAC ============
 
 /** HMAC-SHA256 sign a value (for cookie derivation) */
 async function hmacSign(data: string, secret: string): Promise<string> {
@@ -48,97 +81,159 @@ async function hmacSign(data: string, secret: string): Promise<string> {
     .join("");
 }
 
-/** Status badge class — used across multiple routes */
-function statusBadgeClass(status: string): string {
-  switch (status) {
-    case "watching": return "badge-primary";
-    case "completed": return "badge-success";
-    case "queued": return "badge-warning";
-    case "dropped": return "badge-error";
-    default: return "badge-ghost";
-  }
-}
-
 // ============ AUTH CONFIG ============
 
-const AUTH_TOKEN = Deno.env.get("AUTH_TOKEN") ?? crypto.randomUUID();
-const API_KEY = Deno.env.get("API_KEY") ?? crypto.randomUUID();
+const AUTH_TOKEN = process.env.AUTH_TOKEN ?? crypto.randomUUID();
+const API_KEY = process.env.API_KEY ?? crypto.randomUUID();
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 90; // 90 days
 
 // Derive cookie value from token via HMAC (raw token never stored in cookie)
 const COOKIE_VALUE = await hmacSign("tv-tracker-auth", AUTH_TOKEN);
 
-if (!Deno.env.get("AUTH_TOKEN")) {
+if (!process.env.AUTH_TOKEN) {
   console.log(`[WARN] No AUTH_TOKEN env var set — generated ephemeral token.`);
   console.log(`Auth link: /auth/${AUTH_TOKEN}`);
 }
 
-// Static files with cache headers
-app.use("/static/*", serveStatic({ root: "./" }));
-app.use("/static/*", async (c, next) => {
-  await next();
-  c.res.headers.set("Cache-Control", "public, max-age=86400, immutable");
+function validateApiKey(req: Request): boolean {
+  // Prefer Authorization header, fall back to query param for backward compat
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader) {
+    const bearer = authHeader.replace(/^Bearer\s+/i, "");
+    return bearer === API_KEY;
+  }
+  // Legacy: query param (deprecated)
+  const key = new URL(req.url).searchParams.get("key");
+  return key === API_KEY;
+}
+
+// ============ STATIC FILES ============
+
+const STATIC_DIR = fileURLToPath(new URL("./static", import.meta.url));
+
+const MIME: Record<string, string> = {
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+  ".svg": "image/svg+xml",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json",
+};
+
+function mimeFor(path: string): string {
+  const dot = path.lastIndexOf(".");
+  const ext = dot === -1 ? "" : path.slice(dot).toLowerCase();
+  return MIME[ext] ?? "application/octet-stream";
+}
+
+// ============ PUBLIC LANDING PAGE ============
+
+async function renderLandingPage(): Promise<Response> {
+  const toLanding = (s: db.Show): views.LandingShow => {
+    const p = db.getShowProgress(s.id);
+    return { show: s, watched: p?.watched_episodes ?? 0, total: p?.total_episodes ?? 0 };
+  };
+  const watching = db.getShowsByStatus("watching").map(toLanding);
+  const completed = db.getShowsByStatus("completed").map(toLanding);
+  return html(await views.renderLanding(watching, completed));
+}
+
+// ============ AUTH MIDDLEWARE ============
+
+const authMiddleware: Middleware = async (ctx, next) => {
+  const path = ctx.url.pathname;
+
+  // Always-public paths
+  if (path === "/health" || path.startsWith("/static/") || path.startsWith("/auth/")) {
+    return next();
+  }
+
+  // API-key GET endpoints validate their own key in the handler
+  if (ctx.method === "GET" && (path === "/api/today" || path === "/api/upcoming" || path === "/api/refresh-all")) {
+    return next();
+  }
+
+  // Everything else requires the auth cookie
+  const cookie = getCookieValue(ctx.request, "tv_auth");
+  if (cookie === COOKIE_VALUE) {
+    const res = await next();
+    // Rolling expiry — refresh on every authed visit
+    res.headers.append(
+      "Set-Cookie",
+      serializeCookie("tv_auth", COOKIE_VALUE, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "Lax",
+        path: "/",
+        maxAge: COOKIE_MAX_AGE,
+      })
+    );
+    return res;
+  }
+
+  // Not authed → public landing page (gallery of currently watching)
+  return renderLandingPage();
+};
+
+const router = createRouter({ middleware: [authMiddleware] });
+
+// ============ HEALTH ============
+
+router.get("/health", () => new Response("OK"));
+
+// ============ STATIC ============
+
+router.get("/static/*path", async (ctx) => {
+  const rel = (ctx.params as Record<string, string>).path ?? "";
+  const filePath = join(STATIC_DIR, normalize("/" + rel));
+  if (!filePath.startsWith(STATIC_DIR)) {
+    return new Response("Forbidden", { status: 403 });
+  }
+  try {
+    const data = await readFile(filePath);
+    return new Response(data, {
+      headers: {
+        "Content-Type": mimeFor(filePath),
+        "Cache-Control": "public, max-age=86400, immutable",
+      },
+    });
+  } catch {
+    return new Response("Not found", { status: 404 });
+  }
 });
 
-// Health check endpoint (no auth)
-app.get("/health", (c) => c.text("OK"));
+// ============ AUTH ROUTES ============
 
 // Device token auth — interstitial then cookie
-app.get("/auth/:token", (c) => {
-  const token = c.req.param("token");
+router.get("/auth/:token", async (ctx) => {
+  const token = ctx.params.token;
   if (token !== AUTH_TOKEN) {
-    return c.text("Invalid link", 403);
+    return new Response("Invalid link", { status: 403 });
   }
 
   // Already authed? Go straight to dashboard
-  const existing = getCookie(c, "tv_auth");
+  const existing = getCookieValue(ctx.request, "tv_auth");
   if (existing === COOKIE_VALUE) {
-    return c.redirect("/");
+    return redirect("/");
   }
 
-  // Show interstitial
-  return c.html(`<!DOCTYPE html>
-<html lang="en" data-theme="abyss">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome — TV Tracker</title>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="min-h-screen flex items-center justify-center bg-base-100 p-4">
-  <div class="card bg-base-200 shadow-xl w-full max-w-sm">
-    <div class="card-body">
-      <h1 class="card-title text-2xl">📺 TV Tracker</h1>
-      <p class="text-base-content/60 text-sm mt-2">
-        This link gives you access to the family TV tracker. Once authorized, you can browse shows, mark episodes as watched, and see what's coming up.
-      </p>
-      <div class="divider my-2"></div>
-      <form method="POST" action="/auth/${token}">
-        <label class="flex items-center gap-3 cursor-pointer mb-4">
-          <input type="checkbox" name="remember" value="1" checked class="checkbox checkbox-primary checkbox-sm" />
-          <span class="text-sm">Remember this device for 90 days</span>
-        </label>
-        <button type="submit" class="btn btn-primary w-full">Continue</button>
-      </form>
-    </div>
-  </div>
-</body>
-</html>`);
+  return html(await views.renderAuthInterstitial(token));
 });
 
 // POST handler — actually set the cookie
-app.post("/auth/:token", async (c) => {
-  const token = c.req.param("token");
+router.post("/auth/:token", async (ctx) => {
+  const token = ctx.params.token;
   if (token !== AUTH_TOKEN) {
-    return c.text("Invalid link", 403);
+    return new Response("Invalid link", { status: 403 });
   }
 
-  const body = await c.req.parseBody();
-  const remember = body.remember === "1";
+  const body = await parseFormData(ctx.request);
+  const remember = body.get("remember") === "1";
 
-  setCookie(c, "tv_auth", COOKIE_VALUE, {
+  const setCookie = serializeCookie("tv_auth", COOKIE_VALUE, {
     httpOnly: true,
     secure: true,
     sameSite: "Lax",
@@ -146,825 +241,188 @@ app.post("/auth/:token", async (c) => {
     maxAge: remember ? COOKIE_MAX_AGE : undefined, // session cookie if unchecked
   });
 
-  return c.html(`<!DOCTYPE html><html><head><title>Welcome</title></head><body>
+  return html(
+    `<!DOCTYPE html><html><head><title>Welcome</title></head><body>
 <script>window.location.replace('/');</script>
 <noscript><meta http-equiv="refresh" content="0;url=/"></noscript>
-</body></html>`);
+</body></html>`,
+    200,
+    { "Set-Cookie": setCookie }
+  );
 });
 
-// ============ PRIVATE API ROUTES (API key auth, before cookie middleware) ============
+// ============ PRIVATE API ROUTES (API key auth) ============
 
-function validateApiKey(c: { req: { header: (key: string) => string | undefined; query: (key: string) => string | undefined } }): boolean {
-  // Prefer Authorization header, fall back to query param for backward compat
-  const authHeader = c.req.header("Authorization");
-  if (authHeader) {
-    const bearer = authHeader.replace(/^Bearer\s+/i, "");
-    return bearer === API_KEY;
-  }
-  // Legacy: query param (deprecated, logged to warn)
-  const key = c.req.query("key");
-  return key === API_KEY;
-}
-
-app.get("/api/today", (c) => {
-  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+router.get("/api/today", (ctx) => {
+  if (!validateApiKey(ctx.request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const today = new Date().toISOString().split("T")[0];
-  const episodes = db.getUpcomingEpisodes(0).filter(ep => ep.air_date === today);
-  return c.json({
+  const episodes = db.getUpcomingEpisodes(0).filter((ep) => ep.air_date === today);
+  return Response.json({
     date: today,
-    episodes: episodes.map(ep => ({
+    episodes: episodes.map((ep) => ({
       show: ep.show_title, season: ep.season_number, episode: ep.episode_number,
       title: ep.episode_title, service: ep.service, air_date: ep.air_date,
     })),
   });
 });
 
-app.get("/api/upcoming", (c) => {
-  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
-  const days = parseInt(c.req.query("days") ?? "7");
+router.get("/api/upcoming", (ctx) => {
+  if (!validateApiKey(ctx.request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const days = parseInt(ctx.url.searchParams.get("days") ?? "7");
   const today = new Date().toISOString().split("T")[0];
   const episodes = db.getUpcomingEpisodes(days);
-  return c.json({
+  return Response.json({
     date: today, days_ahead: days,
-    episodes: episodes.map(ep => ({
+    episodes: episodes.map((ep) => ({
       show: ep.show_title, season: ep.season_number, episode: ep.episode_number,
       title: ep.episode_title, service: ep.service, air_date: ep.air_date,
     })),
   });
 });
 
-app.get("/api/refresh-all", async (c) => {
-  if (!validateApiKey(c)) return c.json({ error: "Unauthorized" }, 401);
+router.get("/api/refresh-all", async (ctx) => {
+  if (!validateApiKey(ctx.request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const result = await refreshAllShows();
-  return c.json(result);
+  return Response.json(result);
 });
 
-// Auth middleware — check HMAC cookie, refresh rolling expiry
-app.use("*", async (c, next) => {
-  const cookie = getCookie(c, "tv_auth");
-  if (cookie === COOKIE_VALUE) {
-    // Rolling expiry — refresh on every visit
-    setCookie(c, "tv_auth", COOKIE_VALUE, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "Lax",
-      path: "/",
-      maxAge: COOKIE_MAX_AGE,
-    });
-    return next();
-  }
-  // Public landing page — gallery of currently watching
-  const watching = db.getShowsByStatus("watching");
-  const completed = db.getShowsByStatus("completed");
-  const allShows = [...watching, ...completed];
-
-  const progressMap = new Map<number, { watched: number; total: number }>();
-  for (const s of allShows) {
-    const p = db.getShowProgress(s.id);
-    if (p) progressMap.set(s.id, { watched: p.watched_episodes, total: p.total_episodes });
-  }
-
-  const showCard = (s: db.Show) => {
-    const p = progressMap.get(s.id);
-    const tvmazeUrl = s.tvmaze_id ? `https://www.tvmaze.com/shows/${s.tvmaze_id}` : "#";
-    const progress = p && p.total > 0 ? `${p.watched}/${p.total} episodes` : "";
-    const isDone = s.status === "completed";
-    const imgSrc = safeUrl(s.image_url);
-    return `
-      <a href="${esc(tvmazeUrl)}" target="_blank" rel="noopener" class="group">
-        <div class="relative overflow-hidden rounded-xl bg-base-200 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.03]">
-          ${imgSrc
-            ? `<img src="${imgSrc}" alt="${esc(s.title)}" class="w-full aspect-[2/3] object-cover" loading="lazy">`
-            : `<div class="w-full aspect-[2/3] bg-base-300 flex items-center justify-center text-4xl">📺</div>`}
-          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-          <div class="absolute bottom-0 left-0 right-0 p-3">
-            <h3 class="font-bold text-white text-sm leading-tight">${esc(s.title)}</h3>
-            <div class="flex items-center gap-2 mt-1">
-              ${isDone
-                ? `<span class="badge badge-success badge-xs">Finished</span>`
-                : `<span class="badge badge-primary badge-xs">Watching</span>`}
-              ${progress ? `<span class="text-xs text-white/60">${progress}</span>` : ""}
-            </div>
-            ${s.service ? `<span class="text-xs text-white/40">${esc(s.service)}</span>` : ""}
-          </div>
-        </div>
-      </a>`;
-  };
-
-  const watchingCards = watching.map(showCard).join("");
-  const completedCards = completed.map(showCard).join("");
-
-  return c.html(`<!DOCTYPE html>
-<html lang="en" data-theme="abyss">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>What We're Watching — TV Tracker</title>
-  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="min-h-screen bg-base-100">
-  <div class="max-w-5xl mx-auto px-4 py-12">
-    <div class="text-center mb-10">
-      <h1 class="text-3xl font-bold mb-2">📺 What We're Watching</h1>
-      <p class="text-base-content/50 text-sm">A peek at our current TV rotation</p>
-    </div>
-
-    ${watching.length > 0 ? `
-    <section class="mb-12">
-      <h2 class="text-lg font-semibold text-base-content/70 mb-4">Currently Watching</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        ${watchingCards}
-      </div>
-    </section>
-    ` : ""}
-
-    ${completed.length > 0 ? `
-    <section class="mb-12">
-      <h2 class="text-lg font-semibold text-base-content/70 mb-4">Recently Finished</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        ${completedCards}
-      </div>
-    </section>
-    ` : ""}
-
-    <footer class="text-center text-base-content/30 text-xs mt-16">
-      Tracked with too much enthusiasm
-    </footer>
-  </div>
-</body>
-</html>`, 200);
-});
-
-// ============ HTML TEMPLATES ============
-
-const layout = (title: string, content: string) => html`
-  <!DOCTYPE html>
-  <html lang="en" data-theme="abyss">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>${title} - TV Tracker</title>
-      <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-      <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
-      <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
-      <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
-      <meta name="apple-mobile-web-app-capable" content="yes">
-      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-      <meta name="apple-mobile-web-app-title" content="TV Tracker">
-      <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-      <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-      <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-      <style>
-        .episode-item.watched { opacity: 0.5; }
-        .mobile-nav {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          z-index: 50;
-          display: flex;
-          padding-bottom: env(safe-area-inset-bottom, 0);
-        }
-        .mobile-nav a {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 2px;
-          padding: 8px 0;
-          text-decoration: none;
-          font-size: 11px;
-          transition: color 0.15s;
-        }
-      </style>
-    </head>
-    <body class="min-h-screen bg-base-100 pb-20 lg:pb-0">
-      <!-- Desktop top nav -->
-      <div class="hidden lg:block sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
-        <div class="container mx-auto max-w-6xl px-4 flex items-center h-14">
-          <a href="/" class="font-bold text-lg mr-8">📺 TV Tracker</a>
-          <nav class="flex gap-1">
-            <a href="/" class="btn btn-ghost btn-sm">Home</a>
-            <a href="/upcoming" class="btn btn-ghost btn-sm">Upcoming</a>
-            <a href="/shows" class="btn btn-ghost btn-sm">All Shows</a>
-          </nav>
-          <div class="ml-auto">
-            <a href="/search" class="btn btn-primary btn-sm">+ Add Show</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Mobile header -->
-      <div class="lg:hidden sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
-        <div class="flex items-center justify-center h-12 px-4">
-          <a href="/" class="font-bold text-lg">📺 TV Tracker</a>
-        </div>
-      </div>
-
-      <div class="container mx-auto px-3 py-4 max-w-6xl">
-        ${raw(content)}
-      </div>
-
-      <!-- Mobile bottom nav -->
-      <nav class="mobile-nav lg:hidden bg-base-200 border-t border-base-300">
-        <a href="/" class="text-base-content/70 hover:text-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-          <span>Home</span>
-        </a>
-        <a href="/upcoming" class="text-base-content/70 hover:text-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          <span>Upcoming</span>
-        </a>
-        <a href="/search" class="text-primary font-semibold">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-          <span>Add</span>
-        </a>
-        <a href="/shows" class="text-base-content/70 hover:text-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-          <span>Shows</span>
-        </a>
-      </nav>
-      <script>
-        // Relative date formatting
-        function relativeDate(dateStr) {
-          const d = new Date(dateStr + 'T00:00:00');
-          const now = new Date();
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-          const diffMs = target - today;
-          const diffDays = Math.round(diffMs / 86400000);
-
-          if (diffDays === 0) return 'Today';
-          if (diffDays === 1) return 'Tomorrow';
-          if (diffDays === -1) return 'Yesterday';
-          if (diffDays > 1 && diffDays <= 6) return d.toLocaleDateString('en-US', { weekday: 'long' });
-          if (diffDays < 0 && diffDays >= -6) return Math.abs(diffDays) + 'd ago';
-          if (diffDays < -6 && diffDays >= -30) return Math.abs(Math.round(diffDays / 7)) + 'w ago';
-          if (diffDays > 6 && diffDays <= 30) return 'In ' + Math.round(diffDays / 7) + 'w';
-          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-
-        // Color-code and format dates
-        function formatDates() {
-          const today = new Date().toISOString().split('T')[0];
-          document.querySelectorAll('.ep-date[data-date]').forEach(el => {
-            const d = el.dataset.date;
-            el.textContent = relativeDate(d);
-            el.title = d; // tooltip shows actual date
-            el.classList.remove('text-base-content/50', 'text-primary', 'font-semibold', 'text-warning');
-            if (d === today) {
-              el.classList.add('text-primary', 'font-semibold');
-            } else if (d > today) {
-              el.classList.add('text-warning');
-            } else {
-              el.classList.add('text-base-content/50');
-            }
-          });
-        }
-        formatDates();
-
-        // Watch/unwatch via fetch (no page reload, no history entry)
-        document.addEventListener('click', async (e) => {
-          const btn = e.target.closest('.watch-btn');
-          if (!btn) return;
-          e.preventDefault();
-
-          const showId = parseInt(btn.dataset.show);
-          const season = parseInt(btn.dataset.season);
-          const episode = parseInt(btn.dataset.episode);
-          const currentlyWatched = btn.dataset.watched === '1';
-          const newWatched = !currentlyWatched;
-
-          btn.disabled = true;
-          btn.textContent = '…';
-
-          try {
-            const res = await fetch('/api/watch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ show_id: showId, season, episode, watched: newWatched }),
-            });
-
-            if (res.ok) {
-              const item = btn.closest('.episode-item');
-              if (newWatched) {
-                item.classList.add('watched');
-                btn.classList.remove('btn-primary');
-                btn.classList.add('btn-ghost');
-                btn.textContent = '✕';
-                btn.dataset.watched = '1';
-              } else {
-                item.classList.remove('watched');
-                btn.classList.remove('btn-ghost');
-                btn.classList.add('btn-primary');
-                btn.textContent = '✓';
-                btn.dataset.watched = '0';
-              }
-
-              // Update season watched count if on show page
-              const card = item.closest('.card');
-              if (card) {
-                const countEl = card.querySelector('.watched-count');
-                if (countEl) {
-                  const watched = card.querySelectorAll('.episode-item.watched').length;
-                  const total = card.querySelectorAll('.episode-item').length;
-                  countEl.textContent = watched + '/' + total + ' watched';
-                }
-              }
-            } else {
-              btn.textContent = '!';
-            }
-          } catch {
-            btn.textContent = '!';
-          }
-          btn.disabled = false;
-        });
-
-        // Mark all episodes in a season watched/unwatched
-        document.addEventListener('click', async (e) => {
-          const btn = e.target.closest('.season-watch-all-btn');
-          if (!btn) return;
-          e.preventDefault();
-
-          const showId = parseInt(btn.dataset.show);
-          const season = parseInt(btn.dataset.season);
-          const currentlyAllWatched = btn.dataset.watched === '1';
-          const newWatched = !currentlyAllWatched;
-
-          btn.disabled = true;
-          btn.textContent = '…';
-
-          const card = btn.closest('.card');
-          const episodeBtns = card ? card.querySelectorAll('.watch-btn') : [];
-          const requests = Array.from(episodeBtns).map(epBtn => {
-            const ep = parseInt(epBtn.dataset.episode);
-            return fetch('/api/watch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ show_id: showId, season, episode: ep, watched: newWatched }),
-            });
-          });
-
-          try {
-            await Promise.all(requests);
-            // Update each episode row
-            episodeBtns.forEach(epBtn => {
-              const item = epBtn.closest('.episode-item');
-              if (newWatched) {
-                item.classList.add('watched');
-                epBtn.classList.remove('btn-primary');
-                epBtn.classList.add('btn-ghost');
-                epBtn.textContent = '✕';
-                epBtn.dataset.watched = '1';
-              } else {
-                item.classList.remove('watched');
-                epBtn.classList.remove('btn-ghost');
-                epBtn.classList.add('btn-primary');
-                epBtn.textContent = '✓';
-                epBtn.dataset.watched = '0';
-              }
-            });
-            // Update count and button state
-            const countEl = card ? card.querySelector('.watched-count') : null;
-            if (countEl) {
-              const total = episodeBtns.length;
-              countEl.textContent = (newWatched ? total : 0) + '/' + total + ' watched';
-            }
-            btn.textContent = newWatched ? 'Unmark all' : 'Mark all';
-            btn.dataset.watched = newWatched ? '1' : '0';
-            btn.classList.toggle('btn-outline', !newWatched);
-            btn.classList.toggle('btn-primary', !newWatched);
-            btn.classList.toggle('btn-ghost', newWatched);
-          } catch {
-            btn.textContent = '!';
-          }
-          btn.disabled = false;
-        });
-      </script>
-    </body>
-  </html>
-`;
-
-// ============ ROUTES ============
+// ============ PAGE ROUTES ============
 
 // Dashboard - show progress and unwatched
-app.get("/", (c) => {
+router.get("/", async () => {
   const progress = db.getAllProgress();
   const unwatched = db.getRecentlyAired(14);
-
-  // Get shows with images for progress cards
-  const showsMap = new Map<number, db.Show>();
+  const showsById = new Map<number, db.Show>();
   for (const p of progress) {
     const show = db.getShow(p.show_id);
-    if (show) showsMap.set(p.show_id, show);
+    if (show) showsById.set(p.show_id, show);
   }
-
-  const progressHtml = progress
-    .map((p) => {
-      const show = showsMap.get(p.show_id);
-      const imgSrc = safeUrl(show?.image_url);
-      const pct = p.total_episodes > 0 ? Math.round((p.watched_episodes / p.total_episodes) * 100) : 0;
-      const next = p.next_episode
-        ? `Next: S${p.next_episode.season}E${p.next_episode.episode}${
-            p.next_episode.air_date ? ` (<span class="ep-date" data-date="${esc(p.next_episode.air_date)}">${esc(p.next_episode.air_date)}</span>)` : ""
-          }`
-        : "Up to date";
-      return `
-        <a href="/show/${p.show_id}" class="card bg-base-200 shadow-sm hover:bg-base-300 transition-colors cursor-pointer no-underline">
-          <div class="card-body p-4 flex-row gap-3">
-            ${imgSrc ? `<img src="${imgSrc}" alt="" class="w-16 h-24 object-cover rounded-md shrink-0 bg-base-300" loading="lazy">` : '<div class="w-16 h-24 rounded-md bg-base-300 shrink-0"></div>'}
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-start justify-between gap-2 mb-1">
-                <h3 class="font-semibold text-sm">${esc(p.title)}</h3>
-                <span class="badge ${statusBadgeClass(p.status)} badge-sm">${esc(p.status)}</span>
-              </div>
-              <div class="text-xs text-base-content/60">${esc(p.service ?? "Unknown")}${p.total_episodes > 0 ? ` · ${p.watched_episodes}/${p.total_episodes} episodes` : ""} · ${next}</div>
-              ${p.total_episodes > 0 ? `<progress class="progress progress-primary w-full mt-2" value="${pct}" max="100"></progress>` : ""}
-            </div>
-          </div>
-        </a>
-      `;
-    })
-    .join("");
-
-  const unwatchedHtml = unwatched
-    .map(
-      (ep) => `
-      <div class="episode-item flex flex-wrap items-center gap-2 md:gap-4 p-3 bg-base-200 rounded-lg" id="dash-ep-${ep.show_id}-${ep.season_number}-${ep.episode_number}">
-        <span class="ep-date text-sm whitespace-nowrap" data-date="${esc(ep.air_date)}">${esc(ep.air_date)}</span>
-        <span class="font-semibold text-sm min-w-[50px]">S${ep.season_number}E${ep.episode_number}</span>
-        <span class="flex-1 min-w-[150px] text-sm"><a href="/show/${ep.show_id}" class="link link-hover">${esc(ep.show_title)}</a>${
-          ep.episode_title ? ` - ${esc(ep.episode_title)}` : ""
-        }</span>
-        <button class="btn btn-primary btn-sm watch-btn"
-          data-show="${ep.show_id}" data-season="${ep.season_number}" data-episode="${ep.episode_number}"
-          data-watched="0">✓ Watch</button>
-      </div>
-    `
-    )
-    .join("");
-
-  const content = `
-    <h2 class="text-lg font-bold mb-4">What to Watch Next</h2>
-    ${
-      unwatched.length === 0
-        ? '<p class="text-base-content/60">All caught up! 🎉</p>'
-        : `<div class="flex flex-col gap-2">${unwatchedHtml}</div>`
-    }
-    
-    <h2 class="text-lg font-bold mb-4 mt-8">Currently Watching</h2>
-    ${progress.length === 0 ? '<p class="text-base-content/60">No shows being tracked</p>' : `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${progressHtml}</div>`}
-  `;
-
-  return c.html(layout("Dashboard", content));
+  return html(await views.renderDashboard({ progress, unwatched, showsById }));
 });
 
 // Upcoming episodes — grouped into relative-week buckets with thumbnails
-app.get("/upcoming", (c) => {
-  const days = parseInt(c.req.query("days") ?? "30");
+router.get("/upcoming", async (ctx) => {
+  const days = parseInt(ctx.url.searchParams.get("days") ?? "30");
   const upcoming = db.getUpcomingEpisodes(days);
 
   const today = new Date();
   const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-
   const weekLabel = (w: number): string => {
     if (w === 0) return "This week";
     if (w === 1) return "Next week";
     return `In ${w} weeks`;
   };
 
-  const groups = new Map<number, typeof upcoming>();
+  const groupMap = new Map<number, db.UpcomingEpisode[]>();
   for (const ep of upcoming) {
     const ad = new Date(ep.air_date + "T00:00:00");
     const adMid = new Date(ad.getFullYear(), ad.getMonth(), ad.getDate()).getTime();
     const diffDays = Math.round((adMid - todayMid) / 86400000);
     const week = Math.max(0, Math.floor(diffDays / 7));
-    if (!groups.has(week)) groups.set(week, []);
-    groups.get(week)!.push(ep);
+    if (!groupMap.has(week)) groupMap.set(week, []);
+    groupMap.get(week)!.push(ep);
   }
+  const groups = [...groupMap.keys()].sort((a, b) => a - b).map((week) => ({
+    week, label: weekLabel(week), eps: groupMap.get(week)!,
+  }));
 
-  const sortedWeeks = [...groups.keys()].sort((a, b) => a - b);
-
-  const groupsHtml = sortedWeeks
-    .map((w) => {
-      const eps = groups.get(w)!;
-      const cardsHtml = eps
-        .map((ep) => {
-          const imgSrc = safeUrl(ep.image_url);
-          return `
-            <a href="/show/${ep.show_id}" class="card bg-base-200 shadow-sm hover:bg-base-300 transition-colors no-underline">
-              <div class="card-body p-3 flex-row gap-3 items-center">
-                ${
-                  imgSrc
-                    ? `<img src="${imgSrc}" alt="" class="w-14 h-20 sm:w-16 sm:h-24 object-cover rounded-md shrink-0 bg-base-300" loading="lazy">`
-                    : `<div class="w-14 h-20 sm:w-16 sm:h-24 rounded-md bg-base-300 shrink-0 flex items-center justify-center text-2xl">📺</div>`
-                }
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-semibold text-sm truncate">${esc(ep.show_title)}</h3>
-                  <p class="text-xs text-base-content/60 truncate">S${ep.season_number}E${ep.episode_number}${
-                    ep.episode_title ? ` · ${esc(ep.episode_title)}` : ""
-                  }</p>
-                  <div class="flex items-center gap-2 mt-1 flex-wrap">
-                    <span class="ep-date text-xs" data-date="${esc(ep.air_date)}">${esc(ep.air_date)}</span>
-                    ${ep.service ? `<span class="text-xs text-base-content/40">· ${esc(ep.service)}</span>` : ""}
-                  </div>
-                </div>
-              </div>
-            </a>
-          `;
-        })
-        .join("");
-      return `
-        <section class="mb-6">
-          <h3 class="text-base font-bold text-base-content/70 mb-3">${weekLabel(w)} <span class="text-base-content/40 font-normal">(${eps.length})</span></h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">${cardsHtml}</div>
-        </section>
-      `;
-    })
-    .join("");
-
-  const content = `
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-      <h2 class="text-lg font-bold">Upcoming Episodes</h2>
-      <form method="GET">
-        <select name="days" onchange="this.form.submit()" class="select select-bordered select-sm">
-          <option value="7" ${days === 7 ? "selected" : ""}>7 days</option>
-          <option value="14" ${days === 14 ? "selected" : ""}>14 days</option>
-          <option value="30" ${days === 30 ? "selected" : ""}>30 days</option>
-          <option value="60" ${days === 60 ? "selected" : ""}>60 days</option>
-        </select>
-      </form>
-    </div>
-    ${upcoming.length === 0 ? '<p class="text-base-content/60">No upcoming episodes</p>' : groupsHtml}
-  `;
-
-  return c.html(layout("Upcoming", content));
+  return html(await views.renderUpcoming({ days, groups, empty: upcoming.length === 0 }));
 });
 
 // All shows
-app.get("/shows", (c) => {
-  const status = (c.req.query("status") as db.Show["status"]) ?? undefined;
+router.get("/shows", async (ctx) => {
+  const status = (ctx.url.searchParams.get("status") as db.Show["status"]) || undefined;
   const shows = status ? db.getShowsByStatus(status) : db.getAllShows();
-
-  const showsHtml = shows
-    .map(
-      (s) => `
-      <tr>
-        <td><a href="/show/${s.id}" class="link link-hover">${esc(s.title)}</a></td>
-        <td><span class="badge ${statusBadgeClass(s.status)} badge-sm">${esc(s.status)}</span></td>
-        <td>${esc(s.service)}</td>
-        <td class="text-base-content/60">${esc(s.notes)}</td>
-      </tr>
-    `
-    )
-    .join("");
-
-  const content = `
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-      <h2 class="text-lg font-bold">All Shows (${shows.length})</h2>
-      <form method="GET">
-        <select name="status" onchange="this.form.submit()" class="select select-bordered select-sm">
-          <option value="">All</option>
-          <option value="watching" ${status === "watching" ? "selected" : ""}>Watching</option>
-          <option value="completed" ${status === "completed" ? "selected" : ""}>Completed</option>
-          <option value="queued" ${status === "queued" ? "selected" : ""}>Queued</option>
-          <option value="dropped" ${status === "dropped" ? "selected" : ""}>Dropped</option>
-        </select>
-      </form>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="table table-zebra">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Service</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>${showsHtml}</tbody>
-      </table>
-    </div>
-  `;
-
-  return c.html(layout("All Shows", content));
+  return html(await views.renderShows(shows, status));
 });
 
 // Show detail
-app.get("/show/:id", (c) => {
-  const id = parseInt(c.req.param("id"));
+router.get("/show/:id", async (ctx) => {
+  const id = parseInt(ctx.params.id);
   const show = db.getShow(id);
-
   if (!show) {
-    return c.html(layout("Not Found", '<p class="text-base-content/60">Show not found</p>'));
+    return html(await views.renderNotFound());
   }
-
-  const seasons = db.getSeasons(id);
+  const seasons = db.getSeasons(id).map((season) => ({ season, episodes: db.getEpisodes(season.id) }));
   const progress = db.getShowProgress(id);
-
-  const seasonsHtml = seasons
-    .map((s) => {
-      const episodes = db.getEpisodes(s.id);
-      const watchedCount = episodes.filter((e) => e.watched).length;
-      const episodesHtml = episodes
-        .map(
-          (e) => `
-          <div class="episode-item flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-4 p-3 bg-base-300 rounded-lg ${e.watched ? "watched" : ""}" id="ep-${s.season_number}-${e.episode_number}">
-            <span class="font-semibold text-sm min-w-[50px] md:min-w-[60px]">E${e.episode_number}</span>
-            <span class="flex-1 min-w-[150px] text-sm">${esc(e.title)}</span>
-            ${e.air_date ? `<span class="ep-date text-sm whitespace-nowrap" data-date="${esc(e.air_date)}">${esc(e.air_date)}</span>` : ""}
-            <button class="btn btn-sm watch-btn ${e.watched ? "btn-ghost" : "btn-primary"}"
-              data-show="${id}" data-season="${s.season_number}" data-episode="${e.episode_number}"
-              data-watched="${e.watched ? "1" : "0"}">${e.watched ? "✕" : "✓"}</button>
-          </div>
-        `
-        )
-        .join("");
-
-      const allWatched = watchedCount === episodes.length && episodes.length > 0;
-      return `
-        <div class="card bg-base-200 shadow-sm mb-4">
-          <div class="card-body p-4">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <h3 class="card-title text-base">Season ${s.season_number}</h3>
-              <div class="flex items-center gap-2">
-                <span class="text-base-content/60 text-sm watched-count">${watchedCount}/${episodes.length} watched</span>
-                ${episodes.length > 0 ? `<button class="btn btn-xs season-watch-all-btn ${allWatched ? "btn-ghost" : "btn-outline btn-primary"}"
-                  data-show="${id}" data-season="${s.season_number}" data-watched="${allWatched ? "1" : "0"}">
-                  ${allWatched ? "Unmark all" : "Mark all"}
-                </button>` : ""}
-              </div>
-            </div>
-            <div class="flex flex-col gap-2">${episodesHtml}</div>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  const imgSrc = safeUrl(show.image_url);
-  const content = `
-    <div class="flex gap-4 mb-6">
-      ${imgSrc ? `<img src="${imgSrc}" alt="" class="w-20 h-30 sm:w-24 sm:h-36 object-cover rounded-lg shrink-0 bg-base-300" loading="lazy">` : ''}
-      <div class="flex-1">
-        <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
-          <div>
-            <h2 class="text-xl font-bold">${esc(show.title)}</h2>
-            <p class="text-sm text-base-content/60">${esc(show.service ?? "Unknown service")} · Added ${esc(show.added_at?.split("T")[0])}</p>
-          </div>
-          <span class="badge ${statusBadgeClass(show.status)}">${esc(show.status)}</span>
-        </div>
-        ${show.notes ? `<p class="text-base-content/60 text-sm mb-2">${esc(show.notes)}</p>` : ""}
-        <div class="flex flex-wrap gap-2">
-          <form method="POST" action="/api/status" class="inline">
-            <input type="hidden" name="show_id" value="${id}" />
-            <select name="status" onchange="this.form.submit()" class="select select-bordered select-sm">
-              <option value="watching" ${show.status === "watching" ? "selected" : ""}>Watching</option>
-              <option value="completed" ${show.status === "completed" ? "selected" : ""}>Completed</option>
-              <option value="queued" ${show.status === "queued" ? "selected" : ""}>Queued</option>
-              <option value="dropped" ${show.status === "dropped" ? "selected" : ""}>Dropped</option>
-            </select>
-          </form>
-          <form method="POST" action="/api/refresh" class="inline">
-            <input type="hidden" name="show_id" value="${id}" />
-            <button class="btn btn-ghost btn-sm">↻ Refresh</button>
-          </form>
-        </div>
-      </div>
-    </div>
-    ${
-      progress && progress.total_episodes > 0
-        ? `
-      <div class="card bg-base-200 shadow-sm mb-4">
-        <div class="card-body p-4">
-          <p class="text-sm">Progress: ${progress.watched_episodes}/${progress.total_episodes} episodes (${Math.round((progress.watched_episodes / progress.total_episodes) * 100)}%)</p>
-          <progress class="progress progress-primary w-full mt-2" value="${progress.watched_episodes}" max="${progress.total_episodes}"></progress>
-        </div>
-      </div>
-    `
-        : '<div class="card bg-base-200 shadow-sm mb-4"><div class="card-body p-4"><p class="text-base-content/60">No episode data yet — hit ↻ Refresh to pull from TVMaze</p></div></div>'
-    }
-    ${seasonsHtml}
-  `;
-
-  return c.html(layout(show.title, content));
+  return html(await views.renderShowDetail({ show, progress, seasons }));
 });
 
 // Search / Add show
-app.get("/search", async (c) => {
-  const query = c.req.query("q");
-  let resultsHtml = "";
+router.get("/search", async (ctx) => {
+  const query = ctx.url.searchParams.get("q");
+  let results: views.SearchResultItem[] | null = null;
+  let error: string | null = null;
 
   if (query) {
     try {
-      const results = await tvmaze.searchShows(query);
-      resultsHtml = results
-        .slice(0, 15)
-        .map((r) => {
-          const service = tvmaze.getService(r.show) ?? "Unknown";
-          const imgSrc = safeUrl(r.show.image?.medium);
-          const existing = db.getShowByTvmazeId(r.show.id);
-          return `
-            <div class="flex gap-3 items-center p-3 bg-base-200 rounded-lg mb-2">
-              ${imgSrc ? `<img src="${imgSrc}" alt="" class="w-12 h-18 object-cover rounded shrink-0 bg-base-300" loading="lazy">` : '<div class="w-12 h-18 rounded bg-base-300 shrink-0"></div>'}
-              <div class="flex-1 min-w-0">
-                <strong class="text-sm">${esc(r.show.name)}</strong>
-                <div class="text-xs text-base-content/60">${esc(service)} · ${esc(r.show.status)}</div>
-              </div>
-              <div class="shrink-0">
-                ${
-                  existing
-                    ? `<a href="/show/${existing.id}" class="btn btn-ghost btn-sm">View</a>`
-                    : `
-                    <form method="POST" action="/api/add">
-                      <input type="hidden" name="tvmaze_id" value="${r.show.id}" />
-                      <button class="btn btn-primary btn-sm">+ Add</button>
-                    </form>
-                  `
-                }
-              </div>
-            </div>
-          `;
-        })
-        .join("");
+      const found = await tvmaze.searchShows(query);
+      results = found.slice(0, 15).map((r) => ({
+        tvmazeId: r.show.id,
+        name: r.show.name,
+        service: tvmaze.getService(r.show) ?? "Unknown",
+        status: r.show.status,
+        imageUrl: views.safeUrl(r.show.image?.medium),
+        existingId: db.getShowByTvmazeId(r.show.id)?.id ?? null,
+      }));
     } catch (e) {
-      resultsHtml = `<p class="text-base-content/60">Search failed: ${esc(String(e))}</p>`;
+      error = String(e);
     }
   }
 
-  const content = `
-    <h2 class="text-lg font-bold mb-4">Search TVMaze</h2>
-    <form method="GET" class="flex flex-col sm:flex-row gap-2 mb-6">
-      <input type="text" name="q" placeholder="Search for a show..." value="${esc(query ?? "")}" autofocus inputmode="search" autocomplete="off" autocapitalize="words" class="input flex-1" style="height:3.5rem;font-size:1.125rem;padding:0 1.25rem;" />
-      <button class="btn btn-primary" style="height:3.5rem;font-size:1.125rem;padding:0 1.5rem;">Search</button>
-    </form>
-    <div>${resultsHtml}</div>
-  `;
-
-  return c.html(layout("Add Show", content));
+  return html(await views.renderSearch(query, results, error));
 });
 
-// ============ API ROUTES ============
+// ============ MUTATION API ROUTES ============
 
 // Mark episode watched
-app.post("/api/watch", async (c) => {
-  const contentType = c.req.header("Content-Type") ?? "";
+router.post("/api/watch", async (ctx) => {
+  const contentType = ctx.request.headers.get("Content-Type") ?? "";
 
   if (contentType.includes("application/json")) {
-    const body = await c.req.json();
+    const body = await ctx.request.json();
     db.markEpisodeWatchedByNumber(body.show_id, body.season, body.episode, body.watched);
-    return c.json({ ok: true, watched: body.watched });
+    return Response.json({ ok: true, watched: body.watched });
   }
 
-  const body = await c.req.parseBody();
-  const showId = parseInt(body.show_id as string);
-  const season = parseInt(body.season as string);
-  const episode = parseInt(body.episode as string);
-  const watched = body.watched !== "0";
+  const body = await parseFormData(ctx.request);
+  const showId = parseInt(body.get("show_id") as string);
+  const season = parseInt(body.get("season") as string);
+  const episode = parseInt(body.get("episode") as string);
+  const watched = body.get("watched") !== "0";
 
   db.markEpisodeWatchedByNumber(showId, season, episode, watched);
 
-  const referer = c.req.header("Referer") ?? "/";
-  return c.redirect(referer);
+  const referer = ctx.request.headers.get("Referer") ?? "/";
+  return redirect(referer);
 });
 
 // Change status
-app.post("/api/status", async (c) => {
-  const body = await c.req.parseBody();
-  const showId = parseInt(body.show_id as string);
-  const status = body.status as db.Show["status"];
-
+router.post("/api/status", async (ctx) => {
+  const body = await parseFormData(ctx.request);
+  const showId = parseInt(body.get("show_id") as string);
+  const status = body.get("status") as db.Show["status"];
   db.updateShowStatus(showId, status);
-
-  return c.redirect(`/show/${showId}`);
+  return redirect(`/show/${showId}`);
 });
 
 // Refresh show data
-app.post("/api/refresh", async (c) => {
-  const body = await c.req.parseBody();
-  const showId = parseInt(body.show_id as string);
-
+router.post("/api/refresh", async (ctx) => {
+  const body = await parseFormData(ctx.request);
+  const showId = parseInt(body.get("show_id") as string);
   await tracker.refreshShowData(showId);
-
-  return c.redirect(`/show/${showId}`);
+  return redirect(`/show/${showId}`);
 });
 
 // Add new show
-app.post("/api/add", async (c) => {
-  const body = await c.req.parseBody();
-  const tvmazeId = parseInt(body.tvmaze_id as string);
-
+router.post("/api/add", async (ctx) => {
+  const body = await parseFormData(ctx.request);
+  const tvmazeId = parseInt(body.get("tvmaze_id") as string);
   const show = await tracker.addShowById(tvmazeId);
-
   if (show) {
-    return c.redirect(`/show/${show.id}`);
+    return redirect(`/show/${show.id}`);
   }
-  return c.redirect("/search");
+  return redirect("/search");
 });
 
 // Shared refresh-all logic
@@ -1001,12 +459,11 @@ async function refreshAllShows(): Promise<{ refreshed: number; errors: number; t
 }
 
 // Refresh all (authenticated UI)
-app.post("/api/refresh-all", async (c) => {
+router.post("/api/refresh-all", async (ctx) => {
   await refreshAllShows();
-  const referer = c.req.header("Referer") ?? "/";
-  return c.redirect(referer);
+  const referer = ctx.request.headers.get("Referer") ?? "/";
+  return redirect(referer);
 });
-
 
 // ============ STARTUP ============
 
@@ -1019,13 +476,14 @@ async function seedIfEmpty(): Promise<void> {
 
   console.log("Database is empty, checking for seed files...");
 
-  // Check for shows.json and history.json
   const showsPath = "./shows.json";
   const historyPath = "./history.json";
 
+  let showsRaw: string;
+  let historyRaw: string;
   try {
-    await Deno.stat(showsPath);
-    await Deno.stat(historyPath);
+    showsRaw = await readFile(showsPath, "utf8");
+    historyRaw = await readFile(historyPath, "utf8");
   } catch {
     console.log("No seed files found (shows.json, history.json), starting fresh.");
     return;
@@ -1033,14 +491,11 @@ async function seedIfEmpty(): Promise<void> {
 
   console.log("Found seed files, running migration...");
 
-  // Import and run migrate
   try {
-    const showsData = JSON.parse(await Deno.readTextFile(showsPath));
-    const historyData = JSON.parse(await Deno.readTextFile(historyPath));
-
+    const showsData = JSON.parse(showsRaw);
+    const historyData = JSON.parse(historyRaw);
     const showMap = new Map<string, number>();
 
-    // Process shows by status
     for (const status of ["watching", "completed", "dropped", "queued"] as const) {
       const shows = showsData[status] || [];
       console.log(`  Processing ${status}: ${shows.length} shows`);
@@ -1052,10 +507,8 @@ async function seedIfEmpty(): Promise<void> {
           continue;
         }
 
-        // Try to find on TVMaze
         let tvmazeId: number | undefined;
         let imageUrl: string | undefined;
-
         try {
           const result = await tvmaze.findShow(show.title);
           if (result && result.score > 0.5) {
@@ -1078,7 +531,6 @@ async function seedIfEmpty(): Promise<void> {
 
         showMap.set(show.title.toLowerCase(), id);
 
-        // Fetch episodes if we have TVMaze data
         if (tvmazeId) {
           try {
             await tracker.populateShowData(id);
@@ -1087,17 +539,13 @@ async function seedIfEmpty(): Promise<void> {
           }
         }
 
-        // Rate limit
         await new Promise((r) => setTimeout(r, 300));
       }
     }
 
-    // Process watch history
     for (const entry of historyData) {
       const showId = showMap.get(entry.title.toLowerCase());
       if (!showId) continue;
-
-      const watchedAt = entry.watchedAt || entry.completedAt || new Date().toISOString();
 
       if (entry.action === "watched" && entry.episode) {
         const season = db.getSeason(showId, entry.season);
@@ -1126,10 +574,11 @@ async function seedIfEmpty(): Promise<void> {
 
 // ============ START SERVER ============
 
-const port = parseInt(Deno.env.get("PORT") ?? "8000");
+const port = parseInt(process.env.PORT ?? "8000");
 
-// Seed database if empty
 await seedIfEmpty();
 
-console.log(`TV Tracker running at http://localhost:${port}`);
-Deno.serve({ port }, app.fetch);
+const server = http.createServer(createRequestListener((request) => router.fetch(request)));
+server.listen(port, () => {
+  console.log(`TV Tracker running at http://localhost:${port}`);
+});

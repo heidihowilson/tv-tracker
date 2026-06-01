@@ -5,6 +5,8 @@
 
 import * as db from "./db.ts";
 import * as tvmaze from "./tvmaze.ts";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 interface OldShow {
   title: string;
@@ -36,8 +38,8 @@ interface OldData {
 }
 
 async function migrate() {
-  const showsPath = new URL("./shows.json", import.meta.url).pathname;
-  const historyPath = new URL("./history.json", import.meta.url).pathname;
+  const showsPath = fileURLToPath(new URL("./shows.json", import.meta.url));
+  const historyPath = fileURLToPath(new URL("./history.json", import.meta.url));
 
   console.log("Loading existing data...\n");
 
@@ -45,8 +47,8 @@ async function migrate() {
   let historyData: OldHistory[];
 
   try {
-    showsData = JSON.parse(await Deno.readTextFile(showsPath));
-    historyData = JSON.parse(await Deno.readTextFile(historyPath));
+    showsData = JSON.parse(await readFile(showsPath, "utf8"));
+    historyData = JSON.parse(await readFile(historyPath, "utf8"));
   } catch (e) {
     console.log("Could not read existing files:", e);
     return;
@@ -211,6 +213,6 @@ async function migrate() {
   db.closeDb();
 }
 
-if (import.meta.main) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await migrate();
 }

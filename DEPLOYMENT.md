@@ -55,10 +55,14 @@ git add -A && git commit -m "your message" && git push
 ```
 
 ## Stack
-- **Runtime**: Deno (alpine image)
-- **Framework**: Hono
-- **Database**: SQLite at `/data/tracker.db`
+- **Runtime**: Node.js 22 (Debian slim image), TypeScript run via `tsx`
+- **Framework**: Remix 3 (`@remix-run/fetch-router` + `node-fetch-server`); views in `@remix-run/ui` (JSX SSR)
+- **Database**: SQLite (`better-sqlite3`) at `/data/tracker.db`
 - **Auth**: HMAC cookie via `/auth/:token` magic link
+
+> **Migrated Deno+Hono → Node+Remix 3 (May 2026).** The SQLite file carries over unchanged.
+> Client interactivity moved from an inline `<script>` to `static/app.js` (the `@remix-run/ui`
+> renderer escapes inline script bodies). Local dev: `npm install`, then `npm run dev`.
 
 ## Environment Variables
 | Key | Description |
@@ -97,7 +101,7 @@ curl -s "http://100.123.69.76:8000/api/v1/applications/t8gw8skk00cs8cowk8c8ooc8"
 ssh root@192.168.0.94
 ssh grove@192.168.0.8
 sudo docker ps --filter name=tv-tracker
-sudo docker exec <container> deno eval "import {Database} from 'jsr:@db/sqlite@0.12'; const db = new Database('/data/tracker.db'); console.log(db.prepare('SELECT COUNT(*) as c FROM shows').get()); db.close();"
+sudo docker exec <container> node -e "const D=require('better-sqlite3');const db=new D('/data/tracker.db');console.log(db.prepare('SELECT COUNT(*) as c FROM shows').get());db.close();"
 ```
 
 ### Manual refresh all shows
@@ -107,5 +111,5 @@ curl "https://tv.sethgholson.com/api/refresh-all" -H "Authorization: Bearer c3ce
 
 # Or exec inside container
 CONTAINER=$(ssh root@192.168.0.94 "ssh grove@192.168.0.8 'sudo docker ps --filter name=t8gw8skk --format \"{{.Names}}\" | head -1'")
-ssh root@192.168.0.94 "ssh grove@192.168.0.8 'sudo docker exec $CONTAINER deno run -A tracker.ts refresh 2>&1'"
+ssh root@192.168.0.94 "ssh grove@192.168.0.8 'sudo docker exec $CONTAINER npm run cli -- refresh 2>&1'"
 ```
