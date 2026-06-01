@@ -40,19 +40,60 @@ The SQLite database lives in a Coolify-managed Docker volume:
 
 ## Deployment
 
-### Quick Redeploy
+Coolify deploys the **configured branch** (should be `main`) using the **Dockerfile**
+build pack. The Dockerfile runs `npm ci` + `npm run build:css` and starts `npm run serve`.
+
+### Normal deploy (push to main, then redeploy)
 ```bash
-COOLIFY_TOKEN=$(op item get 'Coolify API Key' --vault Wilson --format json --reveal | jq -r '.fields[] | select(.id=="notesPlain") | .value')
-curl -s -X GET "http://100.123.69.76:8000/api/v1/deploy?uuid=t8gw8skk00cs8cowk8c8ooc8&force=true" \
-  -H "Authorization: Bearer $COOLIFY_TOKEN"
+cd /home/wilson/dev/tv-tracker
+git checkout main && git pull
+# ... merge your PR into main ...
+# Then trigger a deploy in the Coolify UI (Application → Deploy / force rebuild).
 ```
 
-### Push and Deploy
+> ⚠️ **The API-token deploy flow below is currently DISABLED.** As of 2026-06, the
+> "Coolify API Key" token returns `{"success":true,"message":"You are not allowed to
+> access the API."}` on *every* endpoint (`/deploy`, `/version`, `/applications/...`).
+> The instance has API access turned off for this token (or an IP allowlist excludes
+> external hosts). Until that's re-enabled in Coolify (Settings → API / token scope),
+> **deploys and rollbacks must be done in the Coolify web UI**, not via curl.
+>
+> When re-enabled, this is the intended one-shot deploy:
+> ```bash
+> COOLIFY_TOKEN=$(op item get 'Coolify API Key' --vault Wilson --format json --reveal | jq -r '.fields[] | select(.id=="notesPlain") | .value')
+> curl -s -X GET "http://100.123.69.76:8000/api/v1/deploy?uuid=t8gw8skk00cs8cowk8c8ooc8&force=true" \
+>   -H "Authorization: Bearer $COOLIFY_TOKEN"
+> ```
+
+### Force a clean rebuild
+A plain "Redeploy" can reuse cached image layers. After a Dockerfile change (e.g. a new
+`COPY` or build step), use **Deploy with force rebuild** in the UI so the new layers run —
+otherwise the change silently won't take effect.
+
+### Rollback (no data loss)
+The SQLite DB lives in the Docker volume, independent of the image, and the schema is
+stable across the Deno↔Node versions — so rollback never loses data.
+- **Fastest:** Coolify keeps recent per-commit images on the host
+  (`sudo docker images t8gw8skk00cs8cowk8c8ooc8`). Use the **Rollback** button in the UI
+  to swap straight to a prior image — near-instant, no rebuild.
+- Or point the configured branch at a known-good commit and force-rebuild.
+
+### Back up the DB before any deploy
+The live `tracker.db` runs in WAL mode — most recent writes sit in `tracker.db-wal`, NOT
+the main file, so a plain `cp tracker.db` can silently capture a stale snapshot. Back up
+with all three files together, or fold the WAL in with a real SQLite backup:
 ```bash
-cd /home/wilson/.openclaw/workspace-dev/clawd/tv-tracker
-git add -A && git commit -m "your message" && git push
-# Then run quick redeploy command above
+# from a machine that can reach grove (jump via PVE1):
+ssh root@192.168.0.94 "ssh grove@192.168.0.8 'sudo python3 - <<PY
+import sqlite3
+s=sqlite3.connect(\"/var/lib/docker/volumes/t8gw8skk00cs8cowk8c8ooc8_tv-tracker-data/_data/tracker.db\")
+d=sqlite3.connect(\"/home/grove/tv-tracker-backups/tracker-merged.db\")
+with d: s.backup(d)
+print(\"shows\", s.execute(\"select count(*) from shows\").fetchone()[0])
+PY'"
 ```
+A verified backup from 2026-06-01 (16 shows / 148 episodes) is at
+`/home/grove/tv-tracker-backups/` on grove and `/home/wilson/tv-tracker-backups/` locally.
 
 ## Stack
 - **Runtime**: Node.js 22 (Debian slim image), TypeScript run via `tsx`
