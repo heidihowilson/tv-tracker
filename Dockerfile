@@ -22,6 +22,11 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY *.ts *.tsx ./
 COPY static ./static
+COPY styles ./styles
+
+# Precompile Tailwind/DaisyUI into static/app.css so the browser gets a real
+# stylesheet before first paint (no in-browser Tailwind compile = no flash).
+RUN npm run build:css
 
 # SQLite data directory (mounted as a volume in production)
 RUN mkdir -p /data

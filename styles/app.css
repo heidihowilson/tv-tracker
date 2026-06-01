@@ -1,0 +1,13 @@
+/* Tailwind v4 + DaisyUI input. Compiled to static/app.css at build time. */
+@import "tailwindcss" source(none);
+
+/* Scan the server-rendered views and the client script for class names.
+   app.js is critical: it toggles classes (btn-primary↔btn-ghost, text-warning,
+   etc.) at runtime that may not all appear statically in the views. */
+@source "../views.tsx";
+@source "../static/app.js";
+
+/* Only ship the one theme the app uses. */
+@plugin "daisyui" {
+  themes: abyss --default;
+}

@@ -21,7 +21,25 @@
  */
 
 import { renderToString } from "@remix-run/ui/server";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type * as db from "./db.ts";
+
+/**
+ * Cache-busting version for the precompiled stylesheet. Hash of static/app.css,
+ * computed once at startup, so the `?v=` query changes whenever the CSS does
+ * (the static handler serves it with `immutable` caching). Falls back to a
+ * constant if the file isn't present (shouldn't happen — built in the image).
+ */
+const CSS_VERSION = (() => {
+  try {
+    const p = fileURLToPath(new URL("./static/app.css", import.meta.url));
+    return createHash("sha256").update(readFileSync(p)).digest("hex").slice(0, 12);
+  } catch {
+    return "0";
+  }
+})();
 
 /** @remix-run/ui's renderToString takes no doctype option, so we prepend it. */
 async function render(node: unknown): Promise<string> {
@@ -91,9 +109,7 @@ function appLayout(title: string, children: unknown) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="TV Tracker" />
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <link href={`/static/app.css?v=${CSS_VERSION}`} rel="stylesheet" type="text/css" />
         <style>{NAV_STYLE}</style>
       </head>
       <body class="min-h-screen bg-base-100 pb-20 lg:pb-0">
@@ -454,9 +470,7 @@ export function renderAuthInterstitial(token: string): Promise<string> {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Welcome — TV Tracker</title>
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <link href={`/static/app.css?v=${CSS_VERSION}`} rel="stylesheet" type="text/css" />
       </head>
       <body class="min-h-screen flex items-center justify-center bg-base-100 p-4">
         <div class="card bg-base-200 shadow-xl w-full max-w-sm">
@@ -523,9 +537,7 @@ export function renderLanding(watching: LandingShow[], completed: LandingShow[])
         <title>What We're Watching — TV Tracker</title>
         <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png" />
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        <link href={`/static/app.css?v=${CSS_VERSION}`} rel="stylesheet" type="text/css" />
       </head>
       <body class="min-h-screen bg-base-100">
         <div class="max-w-5xl mx-auto px-4 py-12">
