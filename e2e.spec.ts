@@ -96,6 +96,18 @@ try {
   (await page.getByText("Currently Watching").first().isVisible())
     ? pass("dashboard shows 'Currently Watching'") : fail("dashboard missing section");
 
+  // --- Refresh-all wiring: button present + status endpoint shape (no real run) ---
+  (await page.locator("#refresh-all-btn").count()) > 0
+    ? pass("dashboard has Refresh All button")
+    : fail("no Refresh All button");
+  const rstatus = await page.evaluate(async () => {
+    const r = await fetch("/api/refresh-status", { headers: { Accept: "application/json" } });
+    return { status: r.status, body: await r.json() };
+  });
+  rstatus.status === 200 && typeof rstatus.body.running === "boolean" && typeof rstatus.body.total === "number"
+    ? pass(`/api/refresh-status OK (running=${rstatus.body.running})`)
+    : fail(`/api/refresh-status bad: ${JSON.stringify(rstatus)}`);
+
   // --- Client relative-date script transformed the ISO dates ---
   const epDate = page.locator(".ep-date[data-date]").first();
   if (await epDate.count() > 0) {

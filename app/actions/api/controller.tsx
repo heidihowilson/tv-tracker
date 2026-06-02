@@ -6,8 +6,9 @@
  * GET endpoints (today, upcoming, refreshAllGet) are machine-facing and guarded
  * by requireApiKey() at action level. Mutation POSTs (watch, status, refresh,
  * add, refreshAllPost) are web/cookie-facing and guarded by requireAuthed() plus
- * requireSameOrigin() (CSRF defense). Action-level middleware keeps the dual-auth
- * split that the original inline checks expressed.
+ * requireSameOrigin() (CSRF defense). refreshStatus is a cookie-authed GET the
+ * dashboard polls for refresh-all progress. Action-level middleware keeps the
+ * dual-auth split that the original inline checks expressed.
  *
  * /api/watch accepts BOTH JSON and form bodies; it branches on Content-Type. The
  * formData() middleware only parses form/multipart bodies, so the JSON branch
@@ -20,9 +21,9 @@ import * as s from "remix/data-schema";
 
 import { routes } from "../../routes.ts";
 import * as db from "../../data/db.ts";
-import * as tvmaze from "../../../tvmaze.ts";
 import * as tracker from "../../../tracker.ts";
 import { requireApiKey, requireAuthed, requireSameOrigin } from "../../middleware/auth.ts";
+import { startRefreshAll, refreshProgress } from "../../data/refresh-job.ts";
 import { daysQuery, watchJson, watchForm, statusForm, addForm, refreshForm } from "../../data/validators.ts";
 
 /**
@@ -35,37 +36,6 @@ function jsonNoStore(body: unknown): Response {
   const headers = new SuperHeaders();
   headers.cacheControl = { noStore: true };
   return Response.json(body, { headers });
-}
-
-async function refreshAllShows(): Promise<{ refreshed: number; errors: number; total: number }> {
-  const shows = await db.getAllShows();
-  let refreshed = 0;
-  let errors = 0;
-
-  for (const show of shows) {
-    try {
-      if (!show.tvmaze_id) {
-        const result = await tvmaze.findShow(show.title);
-        if (result && result.score > 0.5) {
-          await db.updateShowTvmazeId(show.id, result.show.id);
-          if (result.show.image?.medium) {
-            await db.updateShowImage(show.id, result.show.image.medium);
-          }
-          show.tvmaze_id = result.show.id;
-        }
-      }
-      if (show.tvmaze_id) {
-        await tracker.populateShowData(show.id);
-        refreshed++;
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    } catch (e) {
-      console.error(`Error refreshing ${show.title}:`, e);
-      errors++;
-    }
-  }
-
-  return { refreshed, errors, total: shows.length };
 }
 
 export default createController(routes.api, {
@@ -114,8 +84,24 @@ export default createController(routes.api, {
     refreshAllGet: {
       middleware: [requireApiKey()],
       async handler() {
-        const result = await refreshAllShows();
-        return jsonNoStore(result);
+        // Machine-facing: await the run for the final JSON. If a run is already
+        // in progress (e.g. kicked off from the web UI), don't start a parallel
+        // loop — report busy with the current progress (concurrency guard, #6).
+        const { started, done } = startRefreshAll();
+        if (!started) {
+          const headers = new SuperHeaders();
+          headers.cacheControl = { noStore: true };
+          return Response.json(refreshProgress(), { status: 409, headers });
+        }
+        return jsonNoStore(await done);
+      },
+    },
+
+    refreshStatus: {
+      middleware: [requireAuthed()],
+      handler() {
+        // Poll target for the dashboard banner — current refresh-all progress.
+        return jsonNoStore(refreshProgress());
       },
     },
 
@@ -185,7 +171,10 @@ export default createController(routes.api, {
     refreshAllPost: {
       middleware: [requireSameOrigin(), requireAuthed()],
       async handler({ request }) {
-        await refreshAllShows();
+        // Non-blocking (#5): kick the run off and redirect immediately. The
+        // dashboard renders a progress banner and polls /api/refresh-status. If a
+        // run is already going, startRefreshAll() is a no-op (concurrency guard).
+        startRefreshAll();
         return redirect(request.headers.get("Referer") ?? routes.home.href(), 303);
       },
     },
