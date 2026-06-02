@@ -14,8 +14,8 @@
     "verbatimModuleSyntax": false,
     "resolveJsonModule": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "@remix-run/ui"
+    "jsxImportSource": "remix/ui"
   },
-  "include": ["*.ts", "*.tsx"],
+  "include": ["*.ts", "*.tsx", "app/**/*.ts", "app/**/*.tsx"],
   "exclude": ["node_modules"]
 }

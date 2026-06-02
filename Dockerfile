@@ -2,7 +2,8 @@
 
 # Use Debian-based slim (glibc) so better-sqlite3 uses prebuilt binaries;
 # build tools are present as a fallback if it has to compile from source.
-FROM node:22-slim
+# node:24 — remix@3 requires node >=24.3.0 (engines); node:22 only warns but is unsupported.
+FROM node:24-slim
 
 WORKDIR /app
 
@@ -17,15 +18,16 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # Application code. tsconfig.json is REQUIRED at runtime: tsx/esbuild reads
-# `jsxImportSource: "@remix-run/ui"` from it to compile JSX to the Remix runtime
+# `jsxImportSource: "remix/ui"` from it to compile JSX to the Remix runtime
 # (without it, JSX falls back to React.createElement and the views crash).
 COPY tsconfig.json ./
 COPY *.ts *.tsx ./
-COPY static ./static
+COPY app ./app
+COPY public ./public
 COPY styles ./styles
 
-# Precompile Tailwind/DaisyUI into static/app.css so the browser gets a real
-# stylesheet before first paint (no in-browser Tailwind compile = no flash).
+# Precompile Tailwind/DaisyUI into public/static/app.css so the browser gets a
+# real stylesheet before first paint (no in-browser Tailwind compile = no flash).
 RUN npm run build:css
 
 # SQLite data directory (mounted as a volume in production)

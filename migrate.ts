@@ -3,7 +3,7 @@
  * Import existing shows.json and history.json into SQLite
  */
 
-import * as db from "./db.ts";
+import * as db from "./app/data/db.ts";
 import * as tvmaze from "./tvmaze.ts";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -65,7 +65,7 @@ async function migrate() {
       console.log(`  - ${show.title}`);
 
       // Check if already exists
-      const existing = db.getShowByTitle(show.title);
+      const existing = await db.getShowByTitle(show.title);
       if (existing) {
         showMap.set(show.title.toLowerCase(), existing.id);
         console.log(`    (already exists)`);
@@ -96,7 +96,7 @@ async function migrate() {
 
       // Add to database
       const addedAt = show.added || show.completedAt || new Date().toISOString();
-      const id = db.addShow(show.title, {
+      const id = await db.addShow(show.title, {
         tvmaze_id: tvmazeId,
         service: show.service,
         status,
@@ -113,7 +113,7 @@ async function migrate() {
           const episodes = await tvmaze.getEpisodes(tvmazeId);
 
           for (const season of seasons) {
-            db.addSeason(id, season.number, {
+            await db.addSeason(id, season.number, {
               episode_count: season.episodeOrder ?? undefined,
               premiered: season.premiereDate ?? undefined,
               ended: season.endDate ?? undefined,
@@ -121,9 +121,9 @@ async function migrate() {
           }
 
           for (const ep of episodes) {
-            const season = db.getSeason(id, ep.season);
+            const season = await db.getSeason(id, ep.season);
             if (season) {
-              db.addEpisode(season.id, ep.number, {
+              await db.addEpisode(season.id, ep.number, {
                 title: ep.name,
                 air_date: ep.airdate ?? undefined,
                 runtime: ep.runtime ?? undefined,
@@ -138,16 +138,16 @@ async function migrate() {
       } else {
         // No TVMaze data - create placeholder season/episodes based on existing progress
         if (show.season) {
-          const seasonId = db.addSeason(id, show.season, {});
+          const seasonId = await db.addSeason(id, show.season, {});
           if (show.episode) {
             // Create placeholder episodes up to current
             for (let i = 1; i <= show.episode; i++) {
-              db.addEpisode(seasonId, i, {});
+              await db.addEpisode(seasonId, i, {});
             }
           } else if (show.episodes) {
             // Completed season
             for (let i = 1; i <= show.episodes; i++) {
-              db.addEpisode(seasonId, i, {});
+              await db.addEpisode(seasonId, i, {});
             }
           }
           console.log(`    Created placeholder season ${show.season}`);
@@ -173,27 +173,24 @@ async function migrate() {
 
     if (entry.action === "watched" && entry.episode) {
       // Mark specific episode as watched
-      const season = db.getSeason(showId, entry.season);
+      const season = await db.getSeason(showId, entry.season);
       if (season) {
-        const episode = db.getEpisode(season.id, entry.episode);
+        const episode = await db.getEpisode(season.id, entry.episode);
         if (episode) {
           // Update episode directly without creating duplicate history
-          const dbInst = db.getDb();
-          dbInst.prepare("UPDATE episodes SET watched = 1, watched_at = ? WHERE id = ?").run(watchedAt, episode.id);
+          db.sqlite.prepare("UPDATE episodes SET watched = 1, watched_at = ? WHERE id = ?").run(watchedAt, episode.id);
         }
       }
     } else if (entry.action === "completed") {
       // Mark all episodes in season as watched
-      const season = db.getSeason(showId, entry.season);
+      const season = await db.getSeason(showId, entry.season);
       if (season && entry.episodes) {
-        const dbInst = db.getDb();
-        const stmt = dbInst.prepare("UPDATE episodes SET watched = 1, watched_at = ? WHERE season_id = ?");
-        stmt.run(watchedAt, season.id);
+        db.sqlite.prepare("UPDATE episodes SET watched = 1, watched_at = ? WHERE season_id = ?").run(watchedAt, season.id);
       }
     }
 
     // Add to history
-    db.addWatchHistory({
+    await db.addWatchHistory({
       show_id: showId,
       action: entry.action === "completed" ? "completed" : "watched",
       watched_at: watchedAt,
@@ -203,7 +200,7 @@ async function migrate() {
   console.log("\nMigration complete!");
 
   // Print summary
-  const allShows = db.getAllShows();
+  const allShows = await db.getAllShows();
   console.log(`\nSummary:`);
   console.log(`  Watching: ${allShows.filter((s) => s.status === "watching").length}`);
   console.log(`  Completed: ${allShows.filter((s) => s.status === "completed").length}`);
