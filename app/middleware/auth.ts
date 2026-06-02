@@ -155,6 +155,14 @@ export function requireAuthed(): Middleware {
  * rare client that omits it, and reject a state-changing request that carries
  * neither. Paired with the tv_auth cookie's `SameSite=Lax` (which already withholds
  * the cookie on cross-site POSTs), a forged cross-site request fails both checks.
+ *
+ * We compare `host` (hostname:port), NOT the full `origin` (which includes scheme),
+ * on purpose: TLS terminates at the Coolify/Traefik proxy, so the Node server sees
+ * a plain http connection and `context.url.origin` is `http://tv.sethgholson.com`
+ * while the browser sends `Origin: https://tv.sethgholson.com`. Comparing scheme
+ * would false-reject every legitimate POST in production. Host+port still blocks
+ * the real CSRF vectors (cross-site and cross-port); a same-host scheme downgrade
+ * isn't a CSRF threat for an https-only, proxy-fronted app.
  */
 export function requireSameOrigin(): Middleware {
   return (context, next) => {
