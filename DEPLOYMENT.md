@@ -51,19 +51,24 @@ git checkout main && git pull
 # Then trigger a deploy in the Coolify UI (Application → Deploy / force rebuild).
 ```
 
-> ⚠️ **The API-token deploy flow below is currently DISABLED.** As of 2026-06, the
-> "Coolify API Key" token returns `{"success":true,"message":"You are not allowed to
-> access the API."}` on *every* endpoint (`/deploy`, `/version`, `/applications/...`).
-> The instance has API access turned off for this token (or an IP allowlist excludes
-> external hosts). Until that's re-enabled in Coolify (Settings → API / token scope),
-> **deploys and rollbacks must be done in the Coolify web UI**, not via curl.
->
-> When re-enabled, this is the intended one-shot deploy:
+> ℹ️ **API-token deploys work** (verified 2026-06-02). One-shot force deploy:
 > ```bash
 > COOLIFY_TOKEN=$(op item get 'Coolify API Key' --vault Wilson --format json --reveal | jq -r '.fields[] | select(.id=="notesPlain") | .value')
 > curl -s -X GET "http://100.123.69.76:8000/api/v1/deploy?uuid=t8gw8skk00cs8cowk8c8ooc8&force=true" \
 >   -H "Authorization: Bearer $COOLIFY_TOKEN"
 > ```
+>
+> **About the "Allowed IPs for API Access" setting (Settings → Advanced):** leave it
+> `0.0.0.0` (allow-all). It is *non-functional* on this install and must not be relied on
+> as a security control. The Coolify app is published as `arbor:8000 -> container:8080`, a
+> direct Docker port map (Traefik only fronts 80/443). Docker's userland-proxy masquerades
+> every inbound `:8000` connection to the bridge gateway `10.0.1.1` *before* the app sees
+> it, so `ApiAllowed.php`'s `$request->ip()` always returns `10.0.1.1` regardless of the
+> real caller. A real-IP allowlist matches nothing; allowing `10.0.1.1` would allow
+> everyone. The actual gate is the **root bearer token** plus network isolation (arbor:8000
+> is LAN/tailnet-only, not public). A non-`0.0.0.0` value here returns
+> `{"success":true,"message":"You are not allowed to access the API."}` on *every* endpoint
+> — which previously looked like the token being disabled, but never was.
 
 ### Force a clean rebuild
 A plain "Redeploy" can reuse cached image layers. After a Dockerfile change (e.g. a new
