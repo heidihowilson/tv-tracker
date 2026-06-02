@@ -5,9 +5,9 @@
  *
  * GET endpoints (today, upcoming, refreshAllGet) are machine-facing and guarded
  * by requireApiKey() at action level. Mutation POSTs (watch, status, refresh,
- * add, refreshAllPost) are web/cookie-facing and guarded by requireAuthed().
- * Action-level middleware keeps the dual-auth split that the original inline
- * checks expressed.
+ * add, refreshAllPost) are web/cookie-facing and guarded by requireAuthed() plus
+ * requireSameOrigin() (CSRF defense). Action-level middleware keeps the dual-auth
+ * split that the original inline checks expressed.
  *
  * /api/watch accepts BOTH JSON and form bodies; it branches on Content-Type. The
  * formData() middleware only parses form/multipart bodies, so the JSON branch
@@ -22,7 +22,7 @@ import { routes } from "../../routes.ts";
 import * as db from "../../data/db.ts";
 import * as tvmaze from "../../../tvmaze.ts";
 import * as tracker from "../../../tracker.ts";
-import { requireApiKey, requireAuthed } from "../../middleware/auth.ts";
+import { requireApiKey, requireAuthed, requireSameOrigin } from "../../middleware/auth.ts";
 import { daysQuery, watchJson, watchForm, statusForm, addForm, refreshForm } from "../../data/validators.ts";
 
 /**
@@ -120,7 +120,7 @@ export default createController(routes.api, {
     },
 
     watch: {
-      middleware: [requireAuthed()],
+      middleware: [requireSameOrigin(), requireAuthed()],
       async handler({ request, get }) {
         const contentType = request.headers.get("Content-Type") ?? "";
 
@@ -149,7 +149,7 @@ export default createController(routes.api, {
     },
 
     status: {
-      middleware: [requireAuthed()],
+      middleware: [requireSameOrigin(), requireAuthed()],
       async handler({ get, request }) {
         // Browser <select> form post: bad input redirects back (POST-redirect-GET,
         // 303) instead of returning a JSON blob the browser cannot use.
@@ -162,7 +162,7 @@ export default createController(routes.api, {
     },
 
     refresh: {
-      middleware: [requireAuthed()],
+      middleware: [requireSameOrigin(), requireAuthed()],
       async handler({ get, request }) {
         const parsed = s.parseSafe(refreshForm, get(FormData));
         if (!parsed.success) return redirect(request.headers.get("Referer") ?? routes.shows.href(), 303);
@@ -172,7 +172,7 @@ export default createController(routes.api, {
     },
 
     add: {
-      middleware: [requireAuthed()],
+      middleware: [requireSameOrigin(), requireAuthed()],
       async handler({ get }) {
         const parsed = s.parseSafe(addForm, get(FormData));
         if (!parsed.success) return redirect(routes.search.href(), 303);
@@ -183,7 +183,7 @@ export default createController(routes.api, {
     },
 
     refreshAllPost: {
-      middleware: [requireAuthed()],
+      middleware: [requireSameOrigin(), requireAuthed()],
       async handler({ request }) {
         await refreshAllShows();
         return redirect(request.headers.get("Referer") ?? routes.home.href(), 303);

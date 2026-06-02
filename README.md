@@ -5,10 +5,8 @@ SQLite-backed TV show tracking system with TVMaze integration.
 ## Quick Start
 
 ```bash
-# Run migration (import existing shows.json/history.json)
-npm run migrate
-
-# Start web UI
+# Start web UI (seeds from shows.json/history.json automatically on first run
+# if the database is empty — see app/data/seed.ts)
 npm run serve      # http://localhost:8000
 
 # Or use the CLI
@@ -78,11 +76,12 @@ Data stored in `tracker.db` (SQLite).
 
 ## Files
 
-- `db.ts` - Database schema, migrations, query helpers
+- `app/` - Remix 3 web app (routes, controllers, middleware, UI components, data layer)
+  - `app/data/db.ts` - Database schema and query helpers
+  - `app/data/seed.ts` - First-run import of legacy `shows.json` / `history.json`
 - `tvmaze.ts` - TVMaze API client
 - `tracker.ts` - Main CLI and library functions
-- `migrate.ts` - Import existing JSON data
-- `server.ts` - Web UI (Hono)
+- `server.ts` - Node entry (boots the Remix `fetch-router` over `node-fetch-server`)
 
 ## Environment
 

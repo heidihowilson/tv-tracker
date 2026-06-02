@@ -182,6 +182,17 @@ try {
   const withKey = await fetch(`${BASE}/api/today`, { headers: { Authorization: `Bearer ${API_KEY}` } });
   withKey.status === 200 ? pass("/api/today with Bearer -> 200") : fail(`/api/today bearer -> ${withKey.status}`);
 
+  // --- CSRF same-origin guard: a cross-origin POST to a cookie route is rejected ---
+  // requireSameOrigin runs before requireAuthed, so a forged Origin is a 403
+  // regardless of cookie. The browser-driven watch toggle above proves the
+  // same-origin (positive) path still works.
+  const forged = await fetch(`${BASE}/api/status`, {
+    method: "POST",
+    headers: { Origin: "https://evil.example", "Content-Type": "application/x-www-form-urlencoded" },
+    body: "show_id=1&status=watching",
+  });
+  forged.status === 403 ? pass("cross-origin POST rejected (403)") : fail(`cross-origin POST -> ${forged.status}`);
+
   consoleErrors.length === 0 ? pass("no browser console/page errors") : fail(`console errors: ${JSON.stringify(consoleErrors.slice(0, 5))}`);
 } catch (e) {
   fail("EXCEPTION: " + (e as Error).message);
