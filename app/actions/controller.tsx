@@ -16,6 +16,7 @@ import { routes } from "../routes.ts";
 import * as db from "../data/db.ts";
 import * as tvmaze from "../../tvmaze.ts";
 import { safeUrl } from "../utils/url.ts";
+import { refreshProgress } from "../data/refresh-job.ts";
 import { showIdParam, searchQuery, daysQuery, statusQuery } from "../data/validators.ts";
 import { render } from "./render.tsx";
 import { DashboardPage } from "./home/page.tsx";
@@ -44,7 +45,7 @@ export default createController(routes, {
 
       const watching = await db.getDashboard();
       const unwatched = await db.getRecentlyAired(14);
-      return render(<DashboardPage data={{ watching, unwatched }} />);
+      return render(<DashboardPage data={{ watching, unwatched, refreshing: refreshProgress() }} />);
     },
 
     async upcoming({ url, get }) {

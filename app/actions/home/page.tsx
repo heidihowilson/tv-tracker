@@ -15,11 +15,14 @@ import { Layout } from "../../ui/layout.tsx";
 import { StatusBadge } from "../../ui/status-badge.tsx";
 import { safeUrl } from "../../utils/url.ts";
 import type { Show, ShowProgress, UpcomingEpisode } from "../../data/schema.ts";
+import type { RefreshProgress } from "../../data/refresh-job.ts";
 
 export interface DashboardData {
   /** Currently-watching shows, each progress row paired with its full show row. */
   watching: Array<{ progress: ShowProgress; show: Show }>;
   unwatched: UpcomingEpisode[];
+  /** Live "refresh all" progress; the banner shows when `running` and JS polls. */
+  refreshing: RefreshProgress;
 }
 
 /** One "what to watch next" row with the no-reload watch button. */
@@ -122,7 +125,22 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
     const d = handle.props.data;
     return (
       <Layout title="Dashboard">
-        <h2 class="text-lg font-bold mb-4">What to Watch Next</h2>
+        <div class="flex items-center justify-between mb-4 gap-2">
+          <h2 class="text-lg font-bold">What to Watch Next</h2>
+          <form method="POST" action={routes.api.refreshAllPost.href()}>
+            <button type="submit" id="refresh-all-btn" class="btn btn-ghost btn-sm whitespace-nowrap">
+              ↻ Refresh All
+            </button>
+          </form>
+        </div>
+
+        <div id="refresh-banner" class={`alert alert-info mb-4 ${d.refreshing.running ? "" : "hidden"}`} role="status">
+          <span class="loading loading-spinner loading-sm"></span>
+          <span id="refresh-banner-text">
+            {d.refreshing.running ? `Refreshing ${d.refreshing.refreshed}/${d.refreshing.total || "…"}` : "Refreshing…"}
+          </span>
+        </div>
+
         {d.unwatched.length === 0 ? (
           <p class="text-base-content/60">All caught up! 🎉</p>
         ) : (

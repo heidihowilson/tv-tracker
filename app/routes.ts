@@ -33,6 +33,7 @@ export const routes = route({
     add: post("add"), // POST /api/add          (form)
     refreshAllGet: get("refresh-all"), // GET  /api/refresh-all  (API key)
     refreshAllPost: post("refresh-all"), // POST /api/refresh-all  (cookie)
+    refreshStatus: get("refresh-status"), // GET  /api/refresh-status (cookie) — poll progress
   }),
 });
 

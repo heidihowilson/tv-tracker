@@ -153,3 +153,28 @@ document.addEventListener('click', async (e) => {
   }
   btn.disabled = false;
 });
+
+// Refresh-all progress banner: when a background refresh is running (the banner
+// is server-rendered visible after the POST redirect), poll /api/refresh-status
+// and update the count. When the run finishes, reload once to show fresh data.
+(function () {
+  const banner = document.getElementById('refresh-banner');
+  if (!banner || banner.classList.contains('hidden')) return; // nothing running
+  const text = document.getElementById('refresh-banner-text');
+
+  const timer = setInterval(async () => {
+    try {
+      const res = await fetch('/api/refresh-status', { headers: { Accept: 'application/json' } });
+      if (!res.ok) return;
+      const s = await res.json();
+      if (s.running) {
+        if (text) text.textContent = 'Refreshing ' + s.refreshed + '/' + (s.total || '…');
+      } else {
+        clearInterval(timer);
+        location.reload(); // show the freshly-refreshed data
+      }
+    } catch {
+      /* transient — keep polling */
+    }
+  }, 1500);
+})();
