@@ -3,7 +3,7 @@
  * Track shows, mark episodes watched, manage your watchlist
  */
 
-import * as db from "./db.ts";
+import * as db from "./app/data/db.ts";
 import * as tvmaze from "./tvmaze.ts";
 import { fileURLToPath } from "node:url";
 
@@ -28,7 +28,7 @@ export async function addShowFromSearch(
   }
 
   const show = result.show;
-  const existing = db.getShowByTvmazeId(show.id);
+  const existing = await db.getShowByTvmazeId(show.id);
   if (existing) {
     console.log(`Show already exists: ${existing.title}`);
     return existing;
@@ -36,7 +36,7 @@ export async function addShowFromSearch(
 
   const service = options.service ?? tvmaze.getService(show) ?? undefined;
   const imageUrl = show.image?.medium ?? undefined;
-  const id = db.addShow(show.name, {
+  const id = await db.addShow(show.name, {
     tvmaze_id: show.id,
     service,
     status: options.status ?? "watching",
@@ -48,7 +48,7 @@ export async function addShowFromSearch(
     await populateShowData(id);
   }
 
-  return db.getShow(id)!;
+  return (await db.getShow(id))!;
 }
 
 /**
@@ -63,7 +63,7 @@ export async function addShowById(
     populateEpisodes?: boolean;
   } = {}
 ): Promise<db.Show | null> {
-  const existing = db.getShowByTvmazeId(tvmazeId);
+  const existing = await db.getShowByTvmazeId(tvmazeId);
   if (existing) {
     console.log(`Show already exists: ${existing.title}`);
     return existing;
@@ -73,7 +73,7 @@ export async function addShowById(
   const service = options.service ?? tvmaze.getService(show) ?? undefined;
   const imageUrl = show.image?.medium ?? undefined;
 
-  const id = db.addShow(show.name, {
+  const id = await db.addShow(show.name, {
     tvmaze_id: show.id,
     service,
     status: options.status ?? "watching",
@@ -85,14 +85,14 @@ export async function addShowById(
     await populateShowData(id);
   }
 
-  return db.getShow(id)!;
+  return (await db.getShow(id))!;
 }
 
 /**
  * Fetch and populate seasons/episodes from TVMaze
  */
 export async function populateShowData(showId: number): Promise<void> {
-  const show = db.getShow(showId);
+  const show = await db.getShow(showId);
   if (!show?.tvmaze_id) {
     console.log("Show not found or no TVMaze ID");
     return;
@@ -103,7 +103,7 @@ export async function populateShowData(showId: number): Promise<void> {
   // Fetch show details to update image
   const tvmazeShow = await tvmaze.getShow(show.tvmaze_id);
   if (tvmazeShow.image?.medium && !show.image_url) {
-    db.updateShowImage(showId, tvmazeShow.image.medium);
+    await db.updateShowImage(showId, tvmazeShow.image.medium);
   }
 
   const seasons = await tvmaze.getSeasons(show.tvmaze_id);
@@ -111,7 +111,7 @@ export async function populateShowData(showId: number): Promise<void> {
 
   // Add seasons
   for (const season of seasons) {
-    db.addSeason(showId, season.number, {
+    await db.addSeason(showId, season.number, {
       episode_count: season.episodeOrder ?? undefined,
       premiered: season.premiereDate ?? undefined,
       ended: season.endDate ?? undefined,
@@ -120,9 +120,9 @@ export async function populateShowData(showId: number): Promise<void> {
 
   // Add episodes
   for (const ep of episodes) {
-    const season = db.getSeason(showId, ep.season);
+    const season = await db.getSeason(showId, ep.season);
     if (season) {
-      db.addEpisode(season.id, ep.number, {
+      await db.addEpisode(season.id, ep.number, {
         title: ep.name,
         air_date: ep.airdate ?? undefined,
         runtime: ep.runtime ?? undefined,
@@ -144,7 +144,7 @@ export async function refreshShowData(showId: number): Promise<void> {
  * Refresh all shows that have TVMaze IDs
  */
 export async function refreshAllShows(): Promise<void> {
-  const shows = db.getAllShows().filter((s) => s.tvmaze_id);
+  const shows = (await db.getAllShows()).filter((s) => s.tvmaze_id);
   for (const show of shows) {
     await refreshShowData(show.id);
   }
@@ -153,13 +153,13 @@ export async function refreshAllShows(): Promise<void> {
 /**
  * Mark episode watched by show title and episode numbers
  */
-export function markWatched(
+export async function markWatched(
   showTitle: string,
   season: number,
   episode: number | number[],
   watched: boolean = true
-): boolean {
-  const show = db.getShowByTitle(showTitle);
+): Promise<boolean> {
+  const show = await db.getShowByTitle(showTitle);
   if (!show) {
     console.log(`Show not found: ${showTitle}`);
     return false;
@@ -169,7 +169,7 @@ export function markWatched(
   let success = true;
 
   for (const ep of episodes) {
-    if (!db.markEpisodeWatchedByNumber(show.id, season, ep, watched)) {
+    if (!(await db.markEpisodeWatchedByNumber(show.id, season, ep, watched))) {
       console.log(`Episode not found: S${season}E${ep}`);
       success = false;
     }
@@ -181,20 +181,20 @@ export function markWatched(
 /**
  * Mark all episodes up to a certain point as watched
  */
-export function markWatchedThrough(showTitle: string, season: number, episode: number): boolean {
-  const show = db.getShowByTitle(showTitle);
+export async function markWatchedThrough(showTitle: string, season: number, episode: number): Promise<boolean> {
+  const show = await db.getShowByTitle(showTitle);
   if (!show) {
     console.log(`Show not found: ${showTitle}`);
     return false;
   }
 
-  const seasons = db.getSeasons(show.id);
+  const seasons = await db.getSeasons(show.id);
   const episodeIds: number[] = [];
 
   for (const s of seasons) {
     if (s.season_number > season) break;
 
-    const eps = db.getEpisodes(s.id);
+    const eps = await db.getEpisodes(s.id);
     for (const ep of eps) {
       if (s.season_number === season && ep.episode_number > episode) break;
       if (!ep.watched) {
@@ -204,7 +204,7 @@ export function markWatchedThrough(showTitle: string, season: number, episode: n
   }
 
   if (episodeIds.length > 0) {
-    db.batchMarkWatched(episodeIds, true);
+    await db.batchMarkWatched(episodeIds, true);
     console.log(`Marked ${episodeIds.length} episodes as watched`);
   }
 
@@ -214,36 +214,36 @@ export function markWatchedThrough(showTitle: string, season: number, episode: n
 /**
  * Change show status
  */
-export function setStatus(showTitle: string, status: db.Show["status"]): boolean {
-  const show = db.getShowByTitle(showTitle);
+export async function setStatus(showTitle: string, status: db.Show["status"]): Promise<boolean> {
+  const show = await db.getShowByTitle(showTitle);
   if (!show) {
     console.log(`Show not found: ${showTitle}`);
     return false;
   }
 
-  db.updateShowStatus(show.id, status);
-  db.addWatchHistory({ show_id: show.id, action: status === "completed" ? "completed" : "dropped" });
+  await db.updateShowStatus(show.id, status);
+  await db.addWatchHistory({ show_id: show.id, action: status === "completed" ? "completed" : "dropped" });
   return true;
 }
 
 /**
  * Get shows currently being watched with progress
  */
-export function getWatchingProgress(): db.ShowProgress[] {
+export function getWatchingProgress(): Promise<db.ShowProgress[]> {
   return db.getAllProgress();
 }
 
 /**
  * Get upcoming episodes for tracked shows
  */
-export function getUpcoming(days: number = 14): db.UpcomingEpisode[] {
+export function getUpcoming(days: number = 14): Promise<db.UpcomingEpisode[]> {
   return db.getUpcomingEpisodes(days);
 }
 
 /**
  * Get recently aired unwatched episodes
  */
-export function getUnwatched(days: number = 7): db.UpcomingEpisode[] {
+export function getUnwatched(days: number = 7): Promise<db.UpcomingEpisode[]> {
   return db.getRecentlyAired(days);
 }
 
@@ -308,7 +308,7 @@ async function cli() {
         break;
       }
 
-      if (markWatched(showTitle, season, episode)) {
+      if (await markWatched(showTitle, season, episode)) {
         console.log(`Marked ${showTitle} S${season}E${episode} as watched`);
       }
       break;
@@ -324,7 +324,7 @@ async function cli() {
         break;
       }
 
-      markWatchedThrough(showTitle, season, episode);
+      await markWatchedThrough(showTitle, season, episode);
       break;
     }
 
@@ -337,7 +337,7 @@ async function cli() {
         break;
       }
 
-      if (setStatus(showTitle, status)) {
+      if (await setStatus(showTitle, status)) {
         console.log(`Set ${showTitle} to ${status}`);
       }
       break;
@@ -345,7 +345,7 @@ async function cli() {
 
     case "upcoming": {
       const days = parseInt(args[1]) || 14;
-      const upcoming = getUpcoming(days);
+      const upcoming = await getUpcoming(days);
       if (upcoming.length === 0) {
         console.log("No upcoming episodes");
       } else {
@@ -363,7 +363,7 @@ async function cli() {
 
     case "unwatched": {
       const days = parseInt(args[1]) || 7;
-      const unwatched = getUnwatched(days);
+      const unwatched = await getUnwatched(days);
       if (unwatched.length === 0) {
         console.log("No unwatched episodes");
       } else {
@@ -380,7 +380,7 @@ async function cli() {
     }
 
     case "progress": {
-      const progress = getWatchingProgress();
+      const progress = await getWatchingProgress();
       if (progress.length === 0) {
         console.log("No shows being watched");
       } else {
@@ -399,7 +399,7 @@ async function cli() {
 
     case "list": {
       const status = (args[1] as db.Show["status"]) || "watching";
-      const shows = db.getShowsByStatus(status);
+      const shows = await db.getShowsByStatus(status);
       console.log(`\n${status.toUpperCase()} (${shows.length}):\n`);
       for (const show of shows) {
         console.log(`  ${show.title} [${show.service ?? "?"}]${show.notes ? ` - ${show.notes}` : ""}`);
@@ -410,7 +410,7 @@ async function cli() {
     case "refresh": {
       const showTitle = args[1];
       if (showTitle) {
-        const show = db.getShowByTitle(showTitle);
+        const show = await db.getShowByTitle(showTitle);
         if (show) {
           await refreshShowData(show.id);
         } else {
@@ -430,13 +430,13 @@ async function cli() {
         console.log('Usage: tracker info "Show Name"');
         break;
       }
-      const show = db.getShowByTitle(showTitle);
+      const show = await db.getShowByTitle(showTitle);
       if (!show) {
         console.log(`Show not found: ${showTitle}`);
         break;
       }
-      const progress = db.getShowProgress(show.id);
-      const seasons = db.getSeasons(show.id);
+      const progress = await db.getShowProgress(show.id);
+      const seasons = await db.getSeasons(show.id);
 
       console.log(`\n${show.title}`);
       console.log(`  Status: ${show.status}`);
@@ -449,7 +449,7 @@ async function cli() {
       }
       console.log(`\nSeasons: ${seasons.length}`);
       for (const s of seasons) {
-        const eps = db.getEpisodes(s.id);
+        const eps = await db.getEpisodes(s.id);
         const watched = eps.filter((e) => e.watched).length;
         console.log(`  S${s.season_number}: ${watched}/${eps.length} watched`);
       }

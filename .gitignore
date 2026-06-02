@@ -4,4 +4,4 @@ tracker.db-wal
 tracker.db-shm
 
 # Generated at build time from styles/app.css (see build:css script)
-static/app.css
+public/static/app.css

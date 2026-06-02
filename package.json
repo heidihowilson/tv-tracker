@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i styles/app.css -o static/app.css --minify",
+    "build:css": "tailwindcss -i styles/app.css -o public/static/app.css --minify",
     "migrate": "tsx migrate.ts",
     "cli": "tsx tracker.ts",
     "serve": "npm run build:css && tsx server.ts",
@@ -14,11 +14,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@remix-run/fetch-router": "^0.19.1",
-    "@remix-run/form-data-parser": "^0.17.2",
-    "@remix-run/node-fetch-server": "^0.13.3",
-    "@remix-run/ui": "^0.2.0",
-    "better-sqlite3": "^11.8.1"
+    "better-sqlite3": "^11.8.1",
+    "remix": "3.0.0-beta.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
