@@ -16,7 +16,16 @@ import { createSqliteDatabaseAdapter } from "remix/data-table/sqlite";
 
 import { DB_PATH } from "../config.ts";
 import { shows, seasons, episodes, watchHistory } from "./schema.ts";
-import type { Show, Season, Episode, WatchHistoryRow, UpcomingEpisode, ShowProgress } from "./schema.ts";
+import type {
+  Show,
+  Season,
+  Episode,
+  WatchHistoryRow,
+  UpcomingEpisode,
+  ShowProgress,
+  ShowListItem,
+  WatchHistoryEntry,
+} from "./schema.ts";
 
 export { shows, seasons, episodes, watchHistory };
 export type { Show, Season, Episode, WatchHistoryRow, UpcomingEpisode, ShowProgress };
@@ -155,6 +164,37 @@ export function getAllShows(): Promise<Show[]> {
   }) as Promise<Show[]>;
 }
 
+/**
+ * Every show with its watched/total episode counts in one query (#3, /shows page).
+ * A single grouped LEFT JOIN beats calling getShowProgress() per row. Optionally
+ * narrowed to one status.
+ */
+export async function getShowsWithProgress(status?: Show["status"]): Promise<ShowListItem[]> {
+  // Null-guard param so one query serves both "all" and a single-status filter
+  // (avoids embedding a conditional sql fragment).
+  const st = status ?? null;
+  const result = await db.exec(sql`
+    SELECT
+      sh.*,
+      COUNT(e.id) AS total_episodes,
+      COALESCE(SUM(e.watched), 0) AS watched_episodes
+    FROM shows sh
+    LEFT JOIN seasons se ON se.show_id = sh.id
+    LEFT JOIN episodes e ON e.season_id = se.id
+    WHERE (${st} IS NULL OR sh.status = ${st})
+    GROUP BY sh.id
+    ORDER BY sh.status ASC, sh.title ASC
+  `);
+  return (result.rows ?? []).map((r) => {
+    const { total_episodes, watched_episodes, ...show } = r as Record<string, unknown>;
+    return {
+      show: show as unknown as Show,
+      total: Number(total_episodes) || 0,
+      watched: Number(watched_episodes) || 0,
+    };
+  });
+}
+
 export async function updateShowStatus(id: number, status: Show["status"]): Promise<void> {
   await db.update(shows, id, { status });
 }
@@ -170,6 +210,12 @@ export async function updateShowImage(id: number, imageUrl: string | null): Prom
 
 export async function updateShowTvmazeId(id: number, tvmazeId: number): Promise<void> {
   await db.update(shows, id, { tvmaze_id: tvmazeId });
+}
+
+export async function updateShowDetails(id: number, notes: string | null, service: string | null): Promise<void> {
+  // One UPDATE so a notes+service edit is atomic (both columns persist or neither).
+  // Raw SQL so empty fields clear the columns to NULL faithfully (TableRow omits null).
+  await db.exec(sql`UPDATE shows SET notes = ${notes}, service = ${service} WHERE id = ${id}`);
 }
 
 export async function getShowCount(): Promise<number> {
@@ -309,6 +355,28 @@ export async function addWatchHistory(entry: {
 export async function getWatchHistory(limit: number = 50): Promise<WatchHistoryRow[]> {
   const result = await db.exec(sql`SELECT * FROM watch_history ORDER BY watched_at DESC LIMIT ${limit}`);
   return (result.rows ?? []) as unknown as WatchHistoryRow[];
+}
+
+/** Watch history joined to show/episode details for the /history page (#4). */
+export async function getWatchHistoryDetailed(limit: number = 50): Promise<WatchHistoryEntry[]> {
+  const result = await db.exec(sql`
+    SELECT
+      wh.id,
+      wh.action,
+      wh.watched_at,
+      sh.id AS show_id,
+      sh.title AS show_title,
+      se.season_number,
+      e.episode_number,
+      e.title AS episode_title
+    FROM watch_history wh
+    LEFT JOIN shows sh ON wh.show_id = sh.id
+    LEFT JOIN episodes e ON wh.episode_id = e.id
+    LEFT JOIN seasons se ON e.season_id = se.id
+    ORDER BY wh.watched_at DESC
+    LIMIT ${limit}
+  `);
+  return (result.rows ?? []) as unknown as WatchHistoryEntry[];
 }
 
 // ============ UPCOMING / RECENTLY AIRED (raw joins) ============

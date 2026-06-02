@@ -79,6 +79,22 @@ export const refreshForm = f.object({
   show_id: f.field(coerce.number()),
 });
 
+/** POST /api/delete — form body. */
+export const deleteForm = f.object({
+  show_id: f.field(coerce.number()),
+});
+
+/**
+ * POST /api/update — edit a show's notes/service. Both default to "" (an empty
+ * field clears the column); the handler maps "" → null so blanks aren't stored as
+ * empty strings.
+ */
+export const updateShowForm = f.object({
+  show_id: f.field(coerce.number()),
+  notes: f.field(s.defaulted(s.string(), "").transform((v) => v.trim())),
+  service: f.field(s.defaulted(s.string(), "").transform((v) => v.trim())),
+});
+
 /** POST /auth/:token — form body. */
 export const authForm = f.object({
   remember: f.field(s.defaulted(s.string(), "").transform((v) => v === "1")),

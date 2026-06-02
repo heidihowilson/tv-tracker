@@ -153,7 +153,33 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
                 <input type="hidden" name="show_id" value={String(show.id)} />
                 <button class="btn btn-ghost btn-sm">↻ Refresh</button>
               </form>
+              <form method="POST" action={routes.api.delete.href()} class="inline delete-form">
+                <input type="hidden" name="show_id" value={String(show.id)} />
+                <button class="btn btn-ghost btn-sm text-error">🗑 Delete</button>
+              </form>
             </div>
+
+            <details class="mt-3">
+              <summary class="text-sm text-base-content/60 cursor-pointer select-none">Edit notes &amp; service</summary>
+              <form method="POST" action={routes.api.update.href()} class="mt-2 flex flex-col gap-2 max-w-md">
+                <input type="hidden" name="show_id" value={String(show.id)} />
+                <input
+                  name="service"
+                  value={show.service ?? ""}
+                  placeholder="Service (e.g. Netflix)"
+                  class="input input-bordered input-sm"
+                  autocomplete="off"
+                />
+                <textarea
+                  name="notes"
+                  placeholder="Notes"
+                  rows={3}
+                  class="textarea textarea-bordered textarea-sm"
+                  value={show.notes ?? ""}
+                ></textarea>
+                <button class="btn btn-primary btn-sm self-start">Save</button>
+              </form>
+            </details>
           </div>
         </div>
         {progress && progress.total_episodes > 0 ? (
