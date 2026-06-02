@@ -24,7 +24,16 @@ import * as db from "../../data/db.ts";
 import * as tracker from "../../../tracker.ts";
 import { requireApiKey, requireAuthed, requireSameOrigin } from "../../middleware/auth.ts";
 import { startRefreshAll, refreshProgress } from "../../data/refresh-job.ts";
-import { daysQuery, watchJson, watchForm, statusForm, addForm, refreshForm } from "../../data/validators.ts";
+import {
+  daysQuery,
+  watchJson,
+  watchForm,
+  statusForm,
+  addForm,
+  refreshForm,
+  updateShowForm,
+  deleteForm,
+} from "../../data/validators.ts";
 
 /**
  * JSON for the machine-facing GET endpoints (today, upcoming, refresh-all).
@@ -165,6 +174,30 @@ export default createController(routes.api, {
         const show = await tracker.addShowById(parsed.value.tvmaze_id);
         if (show) return redirect(routes.showDetail.href({ id: String(show.id) }), 303);
         return redirect(routes.search.href(), 303);
+      },
+    },
+
+    update: {
+      middleware: [requireSameOrigin(), requireAuthed()],
+      async handler({ get, request }) {
+        // Edit notes/service (#2). Empty (trimmed) fields clear the column to NULL.
+        const parsed = s.parseSafe(updateShowForm, get(FormData));
+        if (!parsed.success) return redirect(request.headers.get("Referer") ?? routes.shows.href(), 303);
+        const { show_id, notes, service } = parsed.value;
+        await db.updateShowNotes(show_id, notes || null);
+        await db.updateShowService(show_id, service || null);
+        return redirect(routes.showDetail.href({ id: String(show_id) }), 303);
+      },
+    },
+
+    delete: {
+      middleware: [requireSameOrigin(), requireAuthed()],
+      async handler({ get }) {
+        // Remove a show (#1). Seasons/episodes/history cascade via FK ON DELETE.
+        const parsed = s.parseSafe(deleteForm, get(FormData));
+        if (!parsed.success) return redirect(routes.shows.href(), 303);
+        await db.deleteShow(parsed.value.show_id);
+        return redirect(routes.shows.href(), 303);
       },
     },
 

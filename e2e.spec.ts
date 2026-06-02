@@ -116,11 +116,28 @@ try {
     (shown && shown !== raw) ? pass(`relativeDate JS ran (${raw} → "${shown}")`) : fail(`ep-date not transformed ("${shown}")`);
   } else { results.push("--   no .ep-date to check"); }
 
-  // --- Discover a show that has episodes (data-derived, not hardcoded) ---
+  // --- /shows poster rows + progress + client-side filter (#3) ---
   await page.goto(`${BASE}/shows`, { waitUntil: "networkidle" });
-  const rowCount = await page.locator("table tbody tr").count();
-  rowCount >= 1 ? pass(`/shows table has ${rowCount} rows`) : fail("/shows table empty");
-  const firstShowHref = await page.locator('table tbody tr a[href^="/show/"]').first().getAttribute("href");
+  const rowCount = await page.locator(".show-row").count();
+  rowCount >= 1 ? pass(`/shows has ${rowCount} poster rows`) : fail("/shows list empty");
+  // Every row renders a poster slot (an <img> when the show has image_url, else a
+  // placeholder). The committed seed has no images, so assert the slot, not <img>.
+  (await page.locator(".show-row .poster").count()) === rowCount
+    ? pass(`/shows rows have poster slots (${rowCount})`)
+    : fail("/shows rows missing poster slots");
+  (await page.locator(".show-row progress").count()) > 0
+    ? pass("/shows rows have progress bars")
+    : fail("/shows rows missing progress bars");
+  // Client-side title filter: typing a real title prefix narrows the list.
+  const firstTitle = (await page.locator(".show-row").first().getAttribute("data-title")) ?? "";
+  await page.fill("#shows-filter", firstTitle.slice(0, 4));
+  await page.waitForTimeout(200);
+  const visibleAfter = await page.locator(".show-row:not(.hidden)").count();
+  visibleAfter >= 1 && visibleAfter <= rowCount
+    ? pass(`client filter narrowed ${rowCount} -> ${visibleAfter} rows`)
+    : fail(`client filter wrong: ${visibleAfter}/${rowCount}`);
+  await page.fill("#shows-filter", "");
+  const firstShowHref = await page.locator(".show-row").first().getAttribute("href");
   if (!firstShowHref) throw new Error("no show link found on /shows");
 
   // --- Show detail with episodes ---
@@ -169,6 +186,34 @@ try {
       await markAll.click(); await page.waitForTimeout(1200); // revert
     } else { results.push("--   no season-watch-all-btn on this show"); }
   }
+
+  // --- Edit notes/service (#2): fill the form, save, confirm it persisted ---
+  await page.goto(detailUrl, { waitUntil: "networkidle" });
+  const noteVal = `e2e note ${Date.now()}`;
+  if ((await page.locator('form[action="/api/update"] textarea[name="notes"]').count()) > 0) {
+    await page.locator("details summary").first().click().catch(() => {});
+    await page.fill('form[action="/api/update"] textarea[name="notes"]', noteVal);
+    await page.click('form[action="/api/update"] button[type="submit"], form[action="/api/update"] button');
+    await page.waitForLoadState("networkidle");
+    (await page.getByText(noteVal).first().isVisible())
+      ? pass("edited notes persisted and render")
+      : fail("edited notes did not persist");
+  } else {
+    fail("no edit-notes form on show detail");
+  }
+
+  // --- Delete button present (#1) ---
+  (await page.locator('form[action="/api/delete"] button').count()) > 0
+    ? pass("show detail has Delete button")
+    : fail("no Delete button on show detail");
+
+  // --- Watch-history page (#4) ---
+  await page.goto(`${BASE}/history`, { waitUntil: "networkidle" });
+  (await page.getByText("Recently Watched").first().isVisible())
+    ? pass("/history page renders")
+    : fail("/history page missing heading");
+  const histRows = await page.locator(".badge").count();
+  histRows >= 1 ? pass(`/history shows ${histRows} entries`) : results.push("--   /history empty (no watch history in seed)");
 
   // --- No-framework auto-submit select ---
   await page.goto(`${BASE}/upcoming`, { waitUntil: "networkidle" });

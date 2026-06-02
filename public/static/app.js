@@ -154,6 +154,32 @@ document.addEventListener('click', async (e) => {
   btn.disabled = false;
 });
 
+// Delete-show confirmation: intercept the .delete-form submit (kept out of an
+// inline handler since the ui renderer escapes inline scripts).
+document.addEventListener('submit', (e) => {
+  const form = e.target.closest('.delete-form');
+  if (form && !confirm('Delete this show and all its episodes? This cannot be undone.')) {
+    e.preventDefault();
+  }
+});
+
+// /shows client-side title filter: hide rows whose data-title doesn't match.
+(function () {
+  const filter = document.getElementById('shows-filter');
+  if (!filter) return;
+  const empty = document.getElementById('shows-empty');
+  filter.addEventListener('input', () => {
+    const q = filter.value.trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('.show-row').forEach((row) => {
+      const match = (row.dataset.title || '').includes(q);
+      row.classList.toggle('hidden', !match);
+      if (match) visible++;
+    });
+    if (empty) empty.classList.toggle('hidden', visible > 0);
+  });
+})();
+
 // Refresh-all progress banner: when a background refresh is running (the banner
 // is server-rendered visible after the POST redirect), poll /api/refresh-status
 // and update the count. When the run finishes, reload once to show fresh data.

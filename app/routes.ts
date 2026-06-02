@@ -14,6 +14,7 @@ export const routes = route({
   shows: get("/shows"), // GET /shows
   showDetail: get("/show/:id"), // GET /show/:id
   search: get("/search"), // GET /search
+  history: get("/history"), // GET /history
   health: get("/health"), // GET /health
 
   // Magic-link auth: form() expands to index (GET /auth/:token) + action (POST /auth/:token).
@@ -31,6 +32,8 @@ export const routes = route({
     status: post("status"), // POST /api/status       (form)
     refresh: post("refresh"), // POST /api/refresh      (form)
     add: post("add"), // POST /api/add          (form)
+    update: post("update"), // POST /api/update       (form) — edit notes/service
+    delete: post("delete"), // POST /api/delete       (form) — remove a show
     refreshAllGet: get("refresh-all"), // GET  /api/refresh-all  (API key)
     refreshAllPost: post("refresh-all"), // POST /api/refresh-all  (cookie)
     refreshStatus: get("refresh-status"), // GET  /api/refresh-status (cookie) — poll progress

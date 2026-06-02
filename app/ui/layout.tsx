@@ -70,6 +70,9 @@ export function Layout(handle: Handle<{ title: string; children?: RemixNode }>) 
               <a href={routes.shows.href()} class="btn btn-ghost btn-sm">
                 All Shows
               </a>
+              <a href={routes.history.href()} class="btn btn-ghost btn-sm">
+                History
+              </a>
             </nav>
             <div class="ml-auto">
               <a href={routes.search.href()} class="btn btn-primary btn-sm">
@@ -130,6 +133,17 @@ export function Layout(handle: Handle<{ title: string; children?: RemixNode }>) 
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
             <span>Shows</span>
+          </a>
+          <a href={routes.history.href()} class="text-base-content/70 hover:text-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>History</span>
           </a>
         </nav>
         <script src={staticUrl("app.js")}></script>

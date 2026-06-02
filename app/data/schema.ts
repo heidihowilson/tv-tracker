@@ -96,3 +96,22 @@ export interface ShowProgress {
     air_date: string | null;
   } | null;
 }
+
+/** A show row paired with its episode counts (the /shows list, #3). */
+export interface ShowListItem {
+  show: Show;
+  watched: number;
+  total: number;
+}
+
+/** A watch_history row joined to show/episode details (the /history page, #4). */
+export interface WatchHistoryEntry {
+  id: number;
+  action: WatchHistoryRow["action"];
+  watched_at: string;
+  show_id: number | null;
+  show_title: string | null;
+  season_number: number | null;
+  episode_number: number | null;
+  episode_title: string | null;
+}

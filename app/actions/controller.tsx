@@ -25,6 +25,7 @@ import { UpcomingPage } from "./upcoming/page.tsx";
 import { ShowsPage } from "./shows/page.tsx";
 import { ShowDetailPage, NotFoundPage } from "./show/page.tsx";
 import { SearchPage, type SearchResultItem } from "./search/page.tsx";
+import { HistoryPage } from "./history/page.tsx";
 import type { Show } from "../data/schema.ts";
 
 async function renderLanding(): Promise<Response> {
@@ -86,8 +87,8 @@ export default createController(routes, {
 
       const parsed = s.parseSafe(statusQuery, Object.fromEntries(url.searchParams));
       const status = parsed.success ? parsed.value.status : undefined;
-      const shows = status ? await db.getShowsByStatus(status) : await db.getAllShows();
-      return render(<ShowsPage shows={shows} status={status} />);
+      const items = await db.getShowsWithProgress(status);
+      return render(<ShowsPage items={items} status={status} />);
     },
 
     async showDetail({ params, get }) {
@@ -133,6 +134,12 @@ export default createController(routes, {
       }
 
       return render(<SearchPage query={query} results={results} error={error} />);
+    },
+
+    async history({ get }) {
+      if (!get(Authed)) return renderLanding();
+      const entries = await db.getWatchHistoryDetailed(50);
+      return render(<HistoryPage entries={entries} />);
     },
 
     health() {
