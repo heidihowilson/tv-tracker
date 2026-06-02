@@ -22,6 +22,7 @@ import { createContextKey, type Middleware } from "remix/router";
 import { SuperHeaders } from "remix/headers";
 
 import { AUTH_TOKEN, API_KEY, COOKIE_MAX_AGE } from "../config.ts";
+import { safeEqual } from "../utils/crypto.ts";
 
 // ============ HMAC ============
 
@@ -102,7 +103,7 @@ export const Authed = createContextKey<boolean>();
  */
 export function loadAuth(): Middleware<{ key: typeof Authed; value: boolean }> {
   return async (context, next) => {
-    const ok = readAuthCookie(context.request) === COOKIE_VALUE;
+    const ok = safeEqual(readAuthCookie(context.request) ?? "", COOKIE_VALUE);
     context.set(Authed, ok);
     const res = await next();
     if (ok) {
@@ -120,7 +121,7 @@ export function requireApiKey(): Middleware {
     const authHeader = context.request.headers.get("Authorization");
     const bearer = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : null;
     const key = bearer ?? context.url.searchParams.get("key");
-    if (key !== API_KEY) {
+    if (key === null || !safeEqual(key, API_KEY)) {
       const headers = new SuperHeaders();
       headers.cacheControl = { noStore: true };
       return Response.json({ error: "Unauthorized" }, { status: 401, headers });
@@ -138,6 +139,43 @@ export function requireApiKey(): Middleware {
 export function requireAuthed(): Middleware {
   return (context, next) => {
     if (!context.get(Authed)) return new Response("Unauthorized", { status: 401 });
+    return next();
+  };
+}
+
+/**
+ * CSRF defense for the cookie-authed mutation POSTs (watch/status/refresh/add/
+ * refresh-all). We verify the request originates from our own origin rather than
+ * using a synchronizer token: the app has no server-side session store to bind a
+ * per-request token to, and the only shared secret would have to be rendered into
+ * pages — including the *public* landing page — which would leak it to an attacker.
+ *
+ * Origin-checking is stateless and needs no template/JS plumbing. Browsers always
+ * send `Origin` on POST (fetch and form alike); we fall back to `Referer` for the
+ * rare client that omits it, and reject a state-changing request that carries
+ * neither. Paired with the tv_auth cookie's `SameSite=Lax` (which already withholds
+ * the cookie on cross-site POSTs), a forged cross-site request fails both checks.
+ *
+ * We compare `host` (hostname:port), NOT the full `origin` (which includes scheme),
+ * on purpose: TLS terminates at the Coolify/Traefik proxy, so the Node server sees
+ * a plain http connection and `context.url.origin` is `http://tv.sethgholson.com`
+ * while the browser sends `Origin: https://tv.sethgholson.com`. Comparing scheme
+ * would false-reject every legitimate POST in production. Host+port still blocks
+ * the real CSRF vectors (cross-site and cross-port); a same-host scheme downgrade
+ * isn't a CSRF threat for an https-only, proxy-fronted app.
+ */
+export function requireSameOrigin(): Middleware {
+  return (context, next) => {
+    const forbid = () => new Response("Forbidden", { status: 403 });
+    const source = context.request.headers.get("Origin") ?? context.request.headers.get("Referer");
+    if (!source) return forbid();
+    let sourceHost: string;
+    try {
+      sourceHost = new URL(source).host;
+    } catch {
+      return forbid();
+    }
+    if (sourceHost !== context.url.host) return forbid();
     return next();
   };
 }

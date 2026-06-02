@@ -6,7 +6,6 @@
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i styles/app.css -o public/static/app.css --minify",
-    "migrate": "tsx migrate.ts",
     "cli": "tsx tracker.ts",
     "serve": "npm run build:css && tsx server.ts",
     "dev": "npm run build:css && tsx watch server.ts",
