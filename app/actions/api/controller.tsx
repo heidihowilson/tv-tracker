@@ -184,8 +184,7 @@ export default createController(routes.api, {
         const parsed = s.parseSafe(updateShowForm, get(FormData));
         if (!parsed.success) return redirect(request.headers.get("Referer") ?? routes.shows.href(), 303);
         const { show_id, notes, service } = parsed.value;
-        await db.updateShowNotes(show_id, notes || null);
-        await db.updateShowService(show_id, service || null);
+        await db.updateShowDetails(show_id, notes || null, service || null);
         return redirect(routes.showDetail.href({ id: String(show_id) }), 303);
       },
     },

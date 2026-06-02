@@ -87,11 +87,16 @@ export function ShowsPage(handle: Handle<{ items: ShowListItem[]; status?: ShowS
           </div>
         </div>
 
-        <div class="flex flex-col gap-2">
-          {items.map((item) => (
-            <ShowRow item={item} />
-          ))}
-        </div>
+        {items.length === 0 ? (
+          <p class="text-base-content/60">{status ? `No ${status} shows.` : "No shows tracked yet."}</p>
+        ) : (
+          <div class="flex flex-col gap-2">
+            {items.map((item) => (
+              <ShowRow item={item} />
+            ))}
+          </div>
+        )}
+        {/* Shown by static/app.js when the client-side title filter matches nothing. */}
         <p id="shows-empty" class="hidden text-base-content/60 mt-4">
           No shows match your filter.
         </p>

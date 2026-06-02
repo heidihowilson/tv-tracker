@@ -212,13 +212,10 @@ export async function updateShowTvmazeId(id: number, tvmazeId: number): Promise<
   await db.update(shows, id, { tvmaze_id: tvmazeId });
 }
 
-export async function updateShowNotes(id: number, notes: string | null): Promise<void> {
-  // Raw SQL so an empty edit clears the column to NULL faithfully (TableRow omits null).
-  await db.exec(sql`UPDATE shows SET notes = ${notes} WHERE id = ${id}`);
-}
-
-export async function updateShowService(id: number, service: string | null): Promise<void> {
-  await db.exec(sql`UPDATE shows SET service = ${service} WHERE id = ${id}`);
+export async function updateShowDetails(id: number, notes: string | null, service: string | null): Promise<void> {
+  // One UPDATE so a notes+service edit is atomic (both columns persist or neither).
+  // Raw SQL so empty fields clear the columns to NULL faithfully (TableRow omits null).
+  await db.exec(sql`UPDATE shows SET notes = ${notes}, service = ${service} WHERE id = ${id}`);
 }
 
 export async function getShowCount(): Promise<number> {
