@@ -10,6 +10,7 @@ import type { Handle } from "remix/ui";
 import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
 import { onChangeSubmit } from "../../ui/on-change-submit.ts";
+import { PosterThumb } from "../../ui/poster-thumb.tsx";
 import { safeUrl } from "../../utils/url.ts";
 import type { UpcomingEpisode } from "../../data/schema.ts";
 
@@ -29,18 +30,7 @@ function UpcomingCard(handle: Handle<{ ep: UpcomingEpisode }>) {
         class="card bg-base-200 shadow-sm hover:bg-base-300 transition-colors no-underline"
       >
         <div class="card-body p-3 flex-row gap-3 items-center">
-          {imgSrc ? (
-            <img
-              src={imgSrc}
-              alt=""
-              class="w-14 h-20 sm:w-16 sm:h-24 object-cover rounded-md shrink-0 bg-base-300"
-              loading="lazy"
-            />
-          ) : (
-            <div class="w-14 h-20 sm:w-16 sm:h-24 rounded-md bg-base-300 shrink-0 flex items-center justify-center text-2xl">
-              📺
-            </div>
-          )}
+          <PosterThumb src={imgSrc} title={ep.show_title} class="w-14 h-20 sm:w-16 sm:h-24" />
           <div class="flex-1 min-w-0">
             <h3 class="font-semibold text-sm truncate">{ep.show_title}</h3>
             <p class="text-xs text-base-content/60 truncate">
@@ -66,7 +56,7 @@ export function UpcomingPage(handle: Handle<{ data: UpcomingData }>) {
     return (
       <Layout title="Upcoming">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <h2 class="text-lg font-bold">Upcoming Episodes</h2>
+          <h2 class="text-lg font-bold hidden lg:block">Upcoming Episodes</h2>
           <form method="GET">
             <select name="days" {...onChangeSubmit} class="select select-bordered">
               {[7, 14, 30, 60].map((v) => (

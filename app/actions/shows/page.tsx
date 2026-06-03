@@ -58,10 +58,11 @@ export function ShowsPage(handle: Handle<{ items: ShowListItem[]; status?: ShowS
   return () => {
     const { items, status } = handle.props;
     return (
-      <Layout title="All Shows">
+      <Layout title={`All Shows (${items.length})`}>
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div class="flex items-baseline gap-3">
-            <h2 class="text-lg font-bold">{`All Shows (${items.length})`}</h2>
+            {/* Title is shown by the mobile header bar; keep the desktop heading only. */}
+            <h2 class="text-lg font-bold hidden lg:block">{`All Shows (${items.length})`}</h2>
             <a href={routes.history.href()} class="text-sm link link-hover text-primary">
               History →
             </a>

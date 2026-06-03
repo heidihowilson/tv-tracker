@@ -62,7 +62,7 @@ export function HistoryPage(handle: Handle<{ entries: WatchHistoryEntry[] }>) {
     const { entries } = handle.props;
     return (
       <Layout title="History">
-        <h2 class="text-lg font-bold mb-4">Recently Watched</h2>
+        <h2 class="text-lg font-bold mb-4 hidden lg:block">Recently Watched</h2>
         {entries.length === 0 ? (
           <p class="text-base-content/60">No watch history yet.</p>
         ) : (

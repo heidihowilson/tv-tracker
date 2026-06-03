@@ -8,6 +8,7 @@
 import type { Handle } from "remix/ui";
 import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
+import { PosterThumb } from "../../ui/poster-thumb.tsx";
 
 export interface SearchResultItem {
   tvmazeId: number;
@@ -23,11 +24,7 @@ function SearchResult(handle: Handle<{ result: SearchResultItem }>) {
     const r = handle.props.result;
     return (
       <div class="flex gap-3 items-center p-3 bg-base-200 rounded-lg mb-2">
-        {r.imageUrl ? (
-          <img src={r.imageUrl} alt="" class="w-12 h-18 object-cover rounded shrink-0 bg-base-300" loading="lazy" />
-        ) : (
-          <div class="w-12 h-18 rounded bg-base-300 shrink-0"></div>
-        )}
+        <PosterThumb src={r.imageUrl || null} title={r.name} class="w-12 h-18" />
         <div class="flex-1 min-w-0">
           <strong class="text-sm">{r.name}</strong>
           <div class="text-xs text-base-content/60">
@@ -58,7 +55,7 @@ export function SearchPage(
     const { query, results, error } = handle.props;
     return (
       <Layout title="Add Show">
-        <h2 class="text-lg font-bold mb-4">Search TVMaze</h2>
+        <h2 class="text-lg font-bold mb-4 hidden lg:block">Add Show</h2>
         <form method="GET" class="flex flex-col sm:flex-row gap-2 mb-6">
           <input
             type="text"

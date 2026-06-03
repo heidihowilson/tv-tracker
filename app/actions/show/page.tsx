@@ -13,6 +13,7 @@ import type { Handle } from "remix/ui";
 import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
 import { StatusBadge } from "../../ui/status-badge.tsx";
+import { PosterThumb } from "../../ui/poster-thumb.tsx";
 import { onChangeSubmit } from "../../ui/on-change-submit.ts";
 import { cap } from "../../utils/text.ts";
 import { safeUrl } from "../../utils/url.ts";
@@ -117,20 +118,11 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
     return (
       <Layout title={show.title}>
         <div class="flex gap-4 mb-6">
-          {imgSrc ? (
-            <img
-              src={imgSrc}
-              alt=""
-              class="w-20 h-30 sm:w-24 sm:h-36 object-cover rounded-lg shrink-0 bg-base-300"
-              loading="lazy"
-            />
-          ) : (
-            ""
-          )}
-          <div class="flex-1">
+          <PosterThumb src={imgSrc} title={show.title} class="w-20 h-30 sm:w-24 sm:h-36" />
+          <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
               <div>
-                <h2 class="text-xl font-bold">{show.title}</h2>
+                <h2 class="text-xl font-bold hidden lg:block">{show.title}</h2>
                 <p class="text-sm text-base-content/60">
                   {show.service ?? "Unknown service"} · Added {show.added_at?.split("T")[0]}
                 </p>
