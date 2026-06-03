@@ -141,7 +141,7 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
             <div class="flex flex-wrap gap-2">
               <form method="POST" action={routes.api.status.href()} class="inline">
                 <input type="hidden" name="show_id" value={String(show.id)} />
-                <select name="status" {...onChangeSubmit} class="select select-bordered select-sm">
+                <select name="status" {...onChangeSubmit} class="select select-bordered">
                   {STATUSES.map((st) => (
                     <option value={st} selected={show.status === st}>
                       {cap(st)}
@@ -167,14 +167,14 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
                   name="service"
                   value={show.service ?? ""}
                   placeholder="Service (e.g. Netflix)"
-                  class="input input-bordered input-sm"
+                  class="input input-bordered w-full"
                   autocomplete="off"
                 />
                 <textarea
                   name="notes"
                   placeholder="Notes"
                   rows={3}
-                  class="textarea textarea-bordered textarea-sm"
+                  class="textarea textarea-bordered w-full"
                   value={show.notes ?? ""}
                 ></textarea>
                 <button class="btn btn-primary btn-sm self-start">Save</button>
