@@ -68,7 +68,7 @@ export function UpcomingPage(handle: Handle<{ data: UpcomingData }>) {
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 class="text-lg font-bold">Upcoming Episodes</h2>
           <form method="GET">
-            <select name="days" {...onChangeSubmit} class="select select-bordered select-sm">
+            <select name="days" {...onChangeSubmit} class="select select-bordered">
               {[7, 14, 30, 60].map((v) => (
                 <option value={String(v)} selected={d.days === v}>{`${v} days`}</option>
               ))}

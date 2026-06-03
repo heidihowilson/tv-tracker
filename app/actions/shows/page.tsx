@@ -69,11 +69,11 @@ export function ShowsPage(handle: Handle<{ items: ShowListItem[]; status?: ShowS
               id="shows-filter"
               type="text"
               placeholder="Filter by title…"
-              class="input input-bordered input-sm"
+              class="input input-bordered"
               autocomplete="off"
             />
             <form method="GET">
-              <select name="status" {...onChangeSubmit} class="select select-bordered select-sm">
+              <select name="status" {...onChangeSubmit} class="select select-bordered">
                 <option value="" selected={!status}>
                   All
                 </option>

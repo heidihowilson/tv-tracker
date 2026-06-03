@@ -2,9 +2,14 @@
 /** @jsxImportSource remix/ui */
 /**
  * Shared app chrome: the full abyss-themed document with favicons, the
- * precompiled CSS link (cache-busted via CSS_VERSION), desktop + mobile nav, and
- * the external client script. Client JS stays external because the ui renderer
- * escapes inline <script> text.
+ * precompiled CSS link (cache-busted via CSS_VERSION), nav, and the external
+ * client script. Client JS stays external because the ui renderer escapes inline
+ * <script> text.
+ *
+ * Mobile-first chrome (Phase 1): a contextual top bar (page title + optional
+ * action) replaces the wasted centered-logo strip, and a 3-item bottom nav —
+ * Home, Add (center/primary), All Shows. Desktop keeps a top bar with the same
+ * simplified nav. Upcoming/History remain as routes but are off the primary nav.
  *
  * Stateless component: read props from the handle, return a render function.
  */
@@ -30,14 +35,30 @@ const NAV_STYLE = `
           align-items: center;
           justify-content: center;
           gap: 2px;
-          padding: 8px 0;
+          padding: 10px 0;
+          min-height: 56px;
           text-decoration: none;
           font-size: 11px;
-          transition: color 0.15s;
+          transition: color 0.15s, background-color 0.15s;
+          -webkit-tap-highlight-color: transparent;
         }
+        .mobile-nav a:active { background-color: var(--color-base-300); }
+        /* Authoritative: keep the bottom bar off desktop. A bare lg:hidden utility
+           loses to the .mobile-nav rule above on source order, so hide it here. */
+        @media (min-width: 1024px) { .mobile-nav { display: none; } }
       `;
 
-export function Layout(handle: Handle<{ title: string; children?: RemixNode }>) {
+/** Inline TV mark — an SVG so it never renders as a tofu box like the emoji did. */
+function Logo(handle: Handle<{ class?: string }>) {
+  return () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class={handle.props.class ?? "h-6 w-6"}>
+      <rect x="2" y="7" width="20" height="13" rx="2" />
+      <path d="M8 3l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  );
+}
+
+export function Layout(handle: Handle<{ title: string; action?: RemixNode; children?: RemixNode }>) {
   return () => (
     <html lang="en" data-theme="abyss">
       <head>
@@ -55,23 +76,19 @@ export function Layout(handle: Handle<{ title: string; children?: RemixNode }>) 
         <style>{NAV_STYLE}</style>
       </head>
       <body class="min-h-screen bg-base-100 pb-20 lg:pb-0">
+        {/* Desktop top bar: logo + simplified nav + primary Add action. */}
         <div class="hidden lg:block sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
           <div class="container mx-auto max-w-6xl px-4 flex items-center h-14">
-            <a href={routes.home.href()} class="font-bold text-lg mr-8">
-              📺 TV Tracker
+            <a href={routes.home.href()} class="font-bold text-lg mr-8 flex items-center gap-2 text-primary">
+              <Logo class="h-6 w-6" />
+              <span class="text-base-content">TV Tracker</span>
             </a>
             <nav class="flex gap-1">
               <a href={routes.home.href()} class="btn btn-ghost btn-sm">
                 Home
               </a>
-              <a href={routes.upcoming.href()} class="btn btn-ghost btn-sm">
-                Upcoming
-              </a>
               <a href={routes.shows.href()} class="btn btn-ghost btn-sm">
                 All Shows
-              </a>
-              <a href={routes.history.href()} class="btn btn-ghost btn-sm">
-                History
               </a>
             </nav>
             <div class="ml-auto">
@@ -82,19 +99,20 @@ export function Layout(handle: Handle<{ title: string; children?: RemixNode }>) 
           </div>
         </div>
 
-        <div class="lg:hidden sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
-          <div class="flex items-center justify-center h-12 px-4">
-            <a href={routes.home.href()} class="font-bold text-lg">
-              📺 TV Tracker
-            </a>
+        {/* Mobile top bar: contextual (page title + optional action), not a logo strip. */}
+        <header class="lg:hidden sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
+          <div class="flex items-center gap-2 h-14 px-4">
+            <h1 class="font-bold text-lg truncate flex-1">{handle.props.title}</h1>
+            {handle.props.action ? <div class="shrink-0">{handle.props.action}</div> : ""}
           </div>
-        </div>
+        </header>
 
         <div class="container mx-auto px-3 py-4 max-w-6xl">{handle.props.children}</div>
 
+        {/* Mobile bottom nav: Home / Add (primary) / All Shows. */}
         <nav class="mobile-nav lg:hidden bg-base-200 border-t border-base-300">
           <a href={routes.home.href()} class="text-base-content/70 hover:text-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -104,21 +122,10 @@ export function Layout(handle: Handle<{ title: string; children?: RemixNode }>) 
             </svg>
             <span>Home</span>
           </a>
-          <a href={routes.upcoming.href()} class="text-base-content/70 hover:text-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <span>Upcoming</span>
-          </a>
           <a href={routes.search.href()} class="text-primary font-semibold">
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6"
+              class="h-7 w-7"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -129,21 +136,10 @@ export function Layout(handle: Handle<{ title: string; children?: RemixNode }>) 
             <span>Add</span>
           </a>
           <a href={routes.shows.href()} class="text-base-content/70 hover:text-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
-            <span>Shows</span>
-          </a>
-          <a href={routes.history.href()} class="text-base-content/70 hover:text-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>History</span>
+            <span>All Shows</span>
           </a>
         </nav>
         <script src={staticUrl("app.js")}></script>

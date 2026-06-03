@@ -69,12 +69,9 @@ export function SearchPage(
             inputmode="search"
             autocomplete="off"
             autocapitalize="words"
-            class="input flex-1"
-            style="height:3.5rem;font-size:1.125rem;padding:0 1.25rem;"
+            class="input input-bordered flex-1"
           />
-          <button class="btn btn-primary" style="height:3.5rem;font-size:1.125rem;padding:0 1.5rem;">
-            Search
-          </button>
+          <button class="btn btn-primary">Search</button>
         </form>
         <div>
           {error ? <p class="text-base-content/60">{`Search failed: ${error}`}</p> : ""}

@@ -13,3 +13,22 @@
 @plugin "daisyui" {
   themes: abyss --default;
 }
+
+/* ── Native-feeling form controls (mobile-first foundation, Phase 1) ──
+   Rules come after the daisyui plugin so they win on source order. A control
+   font-size < 16px makes iOS Safari auto-zoom the page on focus — the single
+   biggest reason the inputs felt "non-native". 16px kills the zoom; a 44px min
+   height gives a proper touch target. These also neutralise any stray *-sm on a
+   control, so sizing stays consistent without hunting every call site. */
+.input,
+.select,
+.textarea {
+  font-size: 1rem; /* 16px */
+}
+.input,
+.select {
+  min-height: 2.75rem; /* 44px touch target */
+}
+.textarea {
+  min-height: 4rem;
+}
