@@ -46,7 +46,8 @@ export default createController(routes, {
 
       const watching = await db.getDashboard();
       const unwatched = await db.getRecentlyAired(14);
-      return render(<DashboardPage data={{ watching, unwatched, refreshing: refreshProgress() }} />);
+      const comingSoon = (await db.getUpcomingEpisodes(14)).slice(0, 5);
+      return render(<DashboardPage data={{ watching, unwatched, comingSoon, refreshing: refreshProgress() }} />);
     },
 
     async upcoming({ url, get }) {
