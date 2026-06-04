@@ -5,3 +5,6 @@ tracker.db-shm
 
 # Generated at build time from styles/app.css (see build:css script)
 public/static/app.css
+# Copied at build time from @sethmakes/tokens (the compiled CSS references
+# them relatively as ./fonts/*.woff2)
+public/static/fonts/
