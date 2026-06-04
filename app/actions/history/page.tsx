@@ -10,6 +10,8 @@
 import type { Handle } from "remix/ui";
 import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
+import { RelativeDate } from "../../ui/relative-date.tsx";
+import { DesktopTitle } from "../../ui/desktop-title.tsx";
 import { cap } from "../../utils/text.ts";
 import type { WatchHistoryEntry } from "../../data/schema.ts";
 
@@ -49,9 +51,7 @@ function HistoryRow(handle: Handle<{ entry: WatchHistoryEntry }>) {
           {epLabel ? <span class="text-base-content/60">{` · ${epLabel}`}</span> : ""}
           {e.episode_title ? <span class="text-base-content/60">{` · ${e.episode_title}`}</span> : ""}
         </span>
-        <span class="ep-date text-sm whitespace-nowrap text-base-content/50" data-date={day}>
-          {day}
-        </span>
+        <RelativeDate date={day} class="text-sm whitespace-nowrap text-base-content/50" />
       </div>
     );
   };
@@ -62,7 +62,7 @@ export function HistoryPage(handle: Handle<{ entries: WatchHistoryEntry[] }>) {
     const { entries } = handle.props;
     return (
       <Layout title="History">
-        <h2 class="text-lg font-bold mb-4 hidden lg:block">Recently Watched</h2>
+        <DesktopTitle class="mb-4">Recently Watched</DesktopTitle>
         {entries.length === 0 ? (
           <p class="text-base-content/60">No watch history yet.</p>
         ) : (
