@@ -16,7 +16,7 @@ https://tv.sethgholson.com
 - **Project**: TV Tracker (uuid: ssgg84scswksos8cc0wo84ow)
 - **Application**: tv-tracker (uuid: t8gw8skk00cs8cowk8c8ooc8)
 - **Server**: kind-koala (Grove @ PVE2)
-- **Build pack**: Dockerfile (docker-compose.yml is in repo for reference but Coolify uses Dockerfile)
+- **Build pack**: **docker-compose** (`/docker-compose.yml`) — migrated from Dockerfile 2026-06-04 (#29) so the data volume is declared in-repo and honored by Coolify. The domain is set via `docker_compose_domains` (compose-pack apps ignore the `fqdn`/`domains` fields).
 
 ### GitHub
 - **Repo**: https://github.com/heidihowilson/tv-tracker (public)
@@ -29,9 +29,13 @@ The SQLite database lives in a Coolify-managed Docker volume:
 - **Mount point**: `/data/tracker.db` inside the container
 - **Host path on grove**: `/var/lib/docker/volumes/t8gw8skk00cs8cowk8c8ooc8_tv-tracker-data/_data/`
 
-> **Note**: `custom_docker_run_options` in Coolify does NOT apply volume mounts
-> for this Coolify version. The volume was created by an intermediate docker-compose
-> deployment and is now managed by Coolify going forward. Do NOT delete this volume.
+> **Note (#29, resolved 2026-06-04)**: the volume is declared in `docker-compose.yml`
+> (plain named volume `tv-tracker-data`, NOT `external: true`) and Coolify's compose
+> build pack mounts it. The compose project name is the app uuid, so it resolves to
+> the pre-existing `t8gw8skk00cs8cowk8c8ooc8_tv-tracker-data` volume — same data,
+> no migration was needed. Do NOT delete this volume.
+> `custom_docker_run_options` does NOT apply volume mounts on this Coolify version
+> (4.0.0-beta.463) — never rely on it; the dead option was removed from the config.
 
 ### Proxmox Backups
 - Grove (VMID 204, PVE2) is backed up nightly to `usb-backup-nfs`
@@ -40,8 +44,9 @@ The SQLite database lives in a Coolify-managed Docker volume:
 
 ## Deployment
 
-Coolify deploys the **configured branch** (should be `main`) using the **Dockerfile**
-build pack. The Dockerfile runs `npm ci` + `npm run build:css` and starts `npm run serve`.
+Coolify deploys the **configured branch** (should be `main`) using the **docker-compose**
+build pack (`/docker-compose.yml`, which builds the local Dockerfile). The Dockerfile
+runs `npm ci` + `npm run build:css` and starts `npm run serve`.
 
 ### Normal deploy (push to main, then redeploy)
 ```bash

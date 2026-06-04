@@ -21,9 +21,12 @@ services:
       start_period: 10s
       retries: 3
 
+# Plain named volume — must NOT be `external: true` (Coolify 4.0.0-beta.463 won't
+# provision external volumes and the deploy fails). Coolify's compose pack uses the
+# app uuid as the compose project name, so this resolves to the pre-existing
+# `t8gw8skk00cs8cowk8c8ooc8_tv-tracker-data` volume: same data, zero migration.
 volumes:
   tv-tracker-data:
-    external: true
 
 networks:
   coolify:
