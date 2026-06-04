@@ -24,13 +24,13 @@ function formatDates() {
     const d = el.dataset.date;
     el.textContent = relativeDate(d);
     el.title = d; // tooltip shows actual date
-    el.classList.remove('text-base-content/50', 'text-primary', 'font-semibold', 'text-warning');
+    el.classList.remove('text-faint', 'text-accent', 'font-semibold', 'text-warning');
     if (d === today) {
-      el.classList.add('text-primary', 'font-semibold');
+      el.classList.add('text-accent', 'font-semibold');
     } else if (d > today) {
       el.classList.add('text-warning');
     } else {
-      el.classList.add('text-base-content/50');
+      el.classList.add('text-faint');
     }
   });
 }
@@ -62,20 +62,20 @@ document.addEventListener('click', async (e) => {
       const item = btn.closest('.episode-item');
       if (newWatched) {
         item.classList.add('watched');
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-ghost');
+        btn.classList.remove('mk-btn--primary');
+        btn.classList.add('mk-btn--ghost');
         btn.textContent = '✕';
         btn.dataset.watched = '1';
       } else {
         item.classList.remove('watched');
-        btn.classList.remove('btn-ghost');
-        btn.classList.add('btn-primary');
+        btn.classList.remove('mk-btn--ghost');
+        btn.classList.add('mk-btn--primary');
         btn.textContent = '✓';
         btn.dataset.watched = '0';
       }
 
       // Update season watched count if on show page
-      const card = item.closest('.card');
+      const card = item.closest('.mk-card');
       if (card) {
         const countEl = card.querySelector('.watched-count');
         if (countEl) {
@@ -107,7 +107,7 @@ document.addEventListener('click', async (e) => {
   btn.disabled = true;
   btn.textContent = '…';
 
-  const card = btn.closest('.card');
+  const card = btn.closest('.mk-card');
   const episodeBtns = card ? card.querySelectorAll('.watch-btn') : [];
   const requests = Array.from(episodeBtns).map(epBtn => {
     const ep = parseInt(epBtn.dataset.episode);
@@ -125,14 +125,14 @@ document.addEventListener('click', async (e) => {
       const item = epBtn.closest('.episode-item');
       if (newWatched) {
         item.classList.add('watched');
-        epBtn.classList.remove('btn-primary');
-        epBtn.classList.add('btn-ghost');
+        epBtn.classList.remove('mk-btn--primary');
+        epBtn.classList.add('mk-btn--ghost');
         epBtn.textContent = '✕';
         epBtn.dataset.watched = '1';
       } else {
         item.classList.remove('watched');
-        epBtn.classList.remove('btn-ghost');
-        epBtn.classList.add('btn-primary');
+        epBtn.classList.remove('mk-btn--ghost');
+        epBtn.classList.add('mk-btn--primary');
         epBtn.textContent = '✓';
         epBtn.dataset.watched = '0';
       }
@@ -145,9 +145,8 @@ document.addEventListener('click', async (e) => {
     }
     btn.textContent = newWatched ? 'Unmark all' : 'Mark all';
     btn.dataset.watched = newWatched ? '1' : '0';
-    btn.classList.toggle('btn-outline', !newWatched);
-    btn.classList.toggle('btn-primary', !newWatched);
-    btn.classList.toggle('btn-ghost', newWatched);
+    // Tonal default = "Mark all" (actionable), ghost = "Unmark all" (quiet).
+    btn.classList.toggle('mk-btn--ghost', newWatched);
   } catch {
     btn.textContent = '!';
   }

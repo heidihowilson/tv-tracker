@@ -71,7 +71,7 @@ try {
   // unstyled while still returning HTTP 200. Assert real computed styles, not status.
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  // abyss theme is a dark non-transparent color; unstyled would be rgba(0,0,0,0).
+  // mk tokens paint a non-transparent tonal bg; unstyled would be rgba(0,0,0,0).
   bodyBg !== "rgba(0, 0, 0, 0)" && bodyBg !== "transparent"
     ? pass(`CSS applied: body background = ${bodyBg}`)
     : fail(`CSS NOT applied (body background = ${bodyBg}) — likely empty stylesheet`);
@@ -80,8 +80,8 @@ try {
     if (!link) return "";
     return await (await fetch(link.href)).text();
   });
-  cssText.length > 30000 && cssText.includes(".btn-primary")
-    ? pass(`stylesheet is full (${cssText.length} bytes, has DaisyUI classes)`)
+  cssText.length > 30000 && cssText.includes(".mk-btn--primary")
+    ? pass(`stylesheet is full (${cssText.length} bytes, has design-system classes)`)
     : fail(`stylesheet looks empty/partial (${cssText.length} bytes)`);
 
   // --- Magic-link auth flow ---
@@ -223,7 +223,7 @@ try {
   (await page.getByText("Recently Watched").first().isVisible())
     ? pass("/history page renders")
     : fail("/history page missing heading");
-  const histRows = await page.locator(".badge").count();
+  const histRows = await page.locator(".mk-badge").count();
   histRows >= 1 ? pass(`/history shows ${histRows} entries`) : results.push("--   /history empty (no watch history in seed)");
 
   // --- No-framework auto-submit select ---
