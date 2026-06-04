@@ -10,7 +10,8 @@ export function WatchProgress(handle: Handle<{ watched: number; total: number; c
   return () => {
     const { watched, total } = handle.props;
     if (total <= 0) return "";
-    const pct = Math.round((watched / total) * 100);
+    // Clamp so drifting upstream counts can never render an out-of-range value.
+    const pct = Math.max(0, Math.min(100, Math.round((watched / total) * 100)));
     return (
       <progress
         class={`progress progress-primary w-full ${handle.props.class ?? ""}`}

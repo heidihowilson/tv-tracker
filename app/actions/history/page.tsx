@@ -34,7 +34,6 @@ function actionBadge(action: WatchHistoryEntry["action"]): string {
 function HistoryRow(handle: Handle<{ entry: WatchHistoryEntry }>) {
   return () => {
     const e = handle.props.entry;
-    const day = e.watched_at.split("T")[0];
     const epLabel =
       e.season_number != null && e.episode_number != null ? `S${e.season_number}E${e.episode_number}` : null;
     return (
@@ -51,7 +50,8 @@ function HistoryRow(handle: Handle<{ entry: WatchHistoryEntry }>) {
           {epLabel ? <span class="text-base-content/60">{` · ${epLabel}`}</span> : ""}
           {e.episode_title ? <span class="text-base-content/60">{` · ${e.episode_title}`}</span> : ""}
         </span>
-        <RelativeDate date={day} class="text-sm whitespace-nowrap text-base-content/50" />
+        {/* RelativeDate normalizes the full timestamp to YYYY-MM-DD itself. */}
+        <RelativeDate date={e.watched_at} class="text-sm whitespace-nowrap text-base-content/50" />
       </div>
     );
   };
