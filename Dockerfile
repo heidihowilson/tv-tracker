@@ -26,8 +26,9 @@ COPY app ./app
 COPY public ./public
 COPY styles ./styles
 
-# Precompile Tailwind/DaisyUI into public/static/app.css so the browser gets a
-# real stylesheet before first paint (no in-browser Tailwind compile = no flash).
+# Precompile the stylesheet (sethmakes design system + Tailwind utilities) into
+# public/static/app.css — and copy its webfonts — so the browser gets a real
+# stylesheet before first paint (no in-browser Tailwind compile = no flash).
 RUN npm run build:css
 
 # SQLite data directory (mounted as a volume in production)
