@@ -9,6 +9,7 @@ import type { Handle } from "remix/ui";
 import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
 import { PosterThumb } from "../../ui/poster-thumb.tsx";
+import { DesktopTitle } from "../../ui/desktop-title.tsx";
 
 export interface SearchResultItem {
   tvmazeId: number;
@@ -55,7 +56,7 @@ export function SearchPage(
     const { query, results, error } = handle.props;
     return (
       <Layout title="Add Show">
-        <h2 class="text-lg font-bold mb-4 hidden lg:block">Add Show</h2>
+        <DesktopTitle class="mb-4">Add Show</DesktopTitle>
         <form method="GET" class="flex flex-col sm:flex-row gap-2 mb-6">
           <input
             type="text"

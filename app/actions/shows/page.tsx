@@ -10,8 +10,10 @@
 import type { Handle } from "remix/ui";
 import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
-import { StatusBadge } from "../../ui/status-badge.tsx";
 import { PosterThumb } from "../../ui/poster-thumb.tsx";
+import { TitleBadgeRow } from "../../ui/title-badge-row.tsx";
+import { WatchProgress } from "../../ui/watch-progress.tsx";
+import { DesktopTitle } from "../../ui/desktop-title.tsx";
 import { onChangeSubmit } from "../../ui/on-change-submit.ts";
 import { cap } from "../../utils/text.ts";
 import { safeUrl } from "../../utils/url.ts";
@@ -23,7 +25,6 @@ const STATUSES: ShowStatus[] = ["watching", "completed", "queued", "dropped"];
 function ShowRow(handle: Handle<{ item: ShowListItem }>) {
   return () => {
     const { show: s, watched, total } = handle.props.item;
-    const pct = total > 0 ? Math.round((watched / total) * 100) : 0;
     return (
       <a
         href={routes.showDetail.href({ id: String(s.id) })}
@@ -33,20 +34,12 @@ function ShowRow(handle: Handle<{ item: ShowListItem }>) {
         <div class="card-body flex-row items-center gap-3 p-3">
           <PosterThumb src={safeUrl(s.image_url)} title={s.title} class="poster w-12 h-18" />
           <div class="flex-1 min-w-0">
-            {/* Stable single row: title truncates, badge never wraps below it. */}
-            <div class="flex items-center gap-2">
-              <span class="font-semibold text-sm truncate flex-1 min-w-0">{s.title}</span>
-              <StatusBadge status={s.status} />
-            </div>
+            <TitleBadgeRow title={s.title} status={s.status} />
             <div class="text-xs text-base-content/60 mt-0.5 truncate">
               {s.service ?? "Unknown"}
               {total > 0 ? ` · ${watched}/${total} watched` : ""}
             </div>
-            {total > 0 ? (
-              <progress class="progress progress-primary w-full mt-1.5" value={String(pct)} max="100"></progress>
-            ) : (
-              ""
-            )}
+            <WatchProgress watched={watched} total={total} class="mt-1.5" />
           </div>
         </div>
       </a>
@@ -61,8 +54,7 @@ export function ShowsPage(handle: Handle<{ items: ShowListItem[]; status?: ShowS
       <Layout title={`All Shows (${items.length})`}>
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div class="flex items-baseline gap-3">
-            {/* Title is shown by the mobile header bar; keep the desktop heading only. */}
-            <h2 class="text-lg font-bold hidden lg:block">{`All Shows (${items.length})`}</h2>
+            <DesktopTitle>{`All Shows (${items.length})`}</DesktopTitle>
             <a href={routes.history.href()} class="text-sm link link-hover text-primary">
               History →
             </a>

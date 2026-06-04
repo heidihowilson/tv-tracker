@@ -11,6 +11,9 @@ import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
 import { onChangeSubmit } from "../../ui/on-change-submit.ts";
 import { PosterThumb } from "../../ui/poster-thumb.tsx";
+import { CardRow } from "../../ui/card-row.tsx";
+import { RelativeDate } from "../../ui/relative-date.tsx";
+import { DesktopTitle } from "../../ui/desktop-title.tsx";
 import { safeUrl } from "../../utils/url.ts";
 import type { UpcomingEpisode } from "../../data/schema.ts";
 
@@ -25,27 +28,20 @@ function UpcomingCard(handle: Handle<{ ep: UpcomingEpisode }>) {
     const ep = handle.props.ep;
     const imgSrc = safeUrl(ep.image_url);
     return (
-      <a
-        href={routes.showDetail.href({ id: String(ep.show_id) })}
-        class="card bg-base-200 shadow-sm hover:bg-base-300 transition-colors no-underline"
-      >
-        <div class="card-body p-3 flex-row gap-3 items-center">
-          <PosterThumb src={imgSrc} title={ep.show_title} class="w-14 h-20 sm:w-16 sm:h-24" />
-          <div class="flex-1 min-w-0">
-            <h3 class="font-semibold text-sm truncate">{ep.show_title}</h3>
-            <p class="text-xs text-base-content/60 truncate">
-              S{ep.season_number}E{ep.episode_number}
-              {ep.episode_title ? ` · ${ep.episode_title}` : ""}
-            </p>
-            <div class="flex items-center gap-2 mt-1 flex-wrap">
-              <span class="ep-date text-xs" data-date={ep.air_date}>
-                {ep.air_date}
-              </span>
-              {ep.service ? <span class="text-xs text-base-content/40">· {ep.service}</span> : ""}
-            </div>
+      <CardRow href={routes.showDetail.href({ id: String(ep.show_id) })}>
+        <PosterThumb src={imgSrc} title={ep.show_title} class="w-14 h-20 sm:w-16 sm:h-24" />
+        <div class="flex-1 min-w-0">
+          <h3 class="font-semibold text-sm truncate">{ep.show_title}</h3>
+          <p class="text-xs text-base-content/60 truncate">
+            S{ep.season_number}E{ep.episode_number}
+            {ep.episode_title ? ` · ${ep.episode_title}` : ""}
+          </p>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <RelativeDate date={ep.air_date} class="text-xs" />
+            {ep.service ? <span class="text-xs text-base-content/40">· {ep.service}</span> : ""}
           </div>
         </div>
-      </a>
+      </CardRow>
     );
   };
 }
@@ -56,7 +52,7 @@ export function UpcomingPage(handle: Handle<{ data: UpcomingData }>) {
     return (
       <Layout title="Upcoming">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <h2 class="text-lg font-bold hidden lg:block">Upcoming Episodes</h2>
+          <DesktopTitle>Upcoming Episodes</DesktopTitle>
           <form method="GET">
             <select name="days" {...onChangeSubmit} class="select select-bordered">
               {[7, 14, 30, 60].map((v) => (

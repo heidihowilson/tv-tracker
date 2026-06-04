@@ -14,6 +14,9 @@ import { routes } from "../../routes.ts";
 import { Layout } from "../../ui/layout.tsx";
 import { StatusBadge } from "../../ui/status-badge.tsx";
 import { PosterThumb } from "../../ui/poster-thumb.tsx";
+import { RelativeDate } from "../../ui/relative-date.tsx";
+import { WatchProgress } from "../../ui/watch-progress.tsx";
+import { DesktopTitle } from "../../ui/desktop-title.tsx";
 import { onChangeSubmit } from "../../ui/on-change-submit.ts";
 import { cap } from "../../utils/text.ts";
 import { safeUrl } from "../../utils/url.ts";
@@ -46,13 +49,7 @@ function EpisodeRow(handle: Handle<{ showId: number; seasonNumber: number; ep: E
       >
         <span class="font-semibold text-sm min-w-[50px] md:min-w-[60px]">E{e.episode_number}</span>
         <span class="flex-1 min-w-[150px] text-sm">{e.title}</span>
-        {e.air_date ? (
-          <span class="ep-date text-sm whitespace-nowrap" data-date={e.air_date}>
-            {e.air_date}
-          </span>
-        ) : (
-          ""
-        )}
+        {e.air_date ? <RelativeDate date={e.air_date} class="text-sm whitespace-nowrap" /> : ""}
         <button
           class={`btn btn-sm watch-btn ${e.watched ? "btn-ghost" : "btn-primary"}`}
           data-show={String(showId)}
@@ -122,7 +119,7 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
               <div>
-                <h2 class="text-xl font-bold hidden lg:block">{show.title}</h2>
+                <DesktopTitle class="text-xl">{show.title}</DesktopTitle>
                 <p class="text-sm text-base-content/60">
                   {show.service ?? "Unknown service"} · Added {show.added_at?.split("T")[0]}
                 </p>
@@ -178,11 +175,7 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
           <div class="card bg-base-200 shadow-sm mb-4">
             <div class="card-body p-4">
               <p class="text-sm">{`Progress: ${progress.watched_episodes}/${progress.total_episodes} episodes (${pct}%)`}</p>
-              <progress
-                class="progress progress-primary w-full mt-2"
-                value={String(progress.watched_episodes)}
-                max={String(progress.total_episodes)}
-              ></progress>
+              <WatchProgress watched={progress.watched_episodes} total={progress.total_episodes} class="mt-2" />
             </div>
           </div>
         ) : (
