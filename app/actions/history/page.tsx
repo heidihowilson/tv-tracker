@@ -61,7 +61,7 @@ export function HistoryPage(handle: Handle<{ entries: WatchHistoryEntry[] }>) {
   return () => {
     const { entries } = handle.props;
     return (
-      <Layout title="History">
+      <Layout title="History" active="shows">
         <DesktopTitle class="mb-4">Recently Watched</DesktopTitle>
         {entries.length === 0 ? (
           <p class="text-base-content/60">No watch history yet.</p>

@@ -50,7 +50,7 @@ export function UpcomingPage(handle: Handle<{ data: UpcomingData }>) {
   return () => {
     const d = handle.props.data;
     return (
-      <Layout title="Upcoming">
+      <Layout title="Upcoming" active="home">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <DesktopTitle>Upcoming Episodes</DesktopTitle>
           <form method="GET">

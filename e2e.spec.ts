@@ -108,6 +108,17 @@ try {
     ? pass(`/api/refresh-status OK (running=${rstatus.body.running})`)
     : fail(`/api/refresh-status bad: ${JSON.stringify(rstatus)}`);
 
+  // --- Bottom-nav active state: the current tab carries aria-current="page" ---
+  // (The bar is display:none at this desktop viewport but present in the DOM.)
+  const activeHref = await page
+    .locator('.mobile-nav a[aria-current="page"]')
+    .first()
+    .getAttribute("href")
+    .catch(() => null);
+  activeHref === "/"
+    ? pass("bottom nav marks Home active on dashboard")
+    : fail(`bottom nav active href = ${activeHref}`);
+
   // --- Client relative-date script transformed the ISO dates ---
   const epDate = page.locator(".ep-date[data-date]").first();
   if (await epDate.count() > 0) {
