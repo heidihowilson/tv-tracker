@@ -55,7 +55,7 @@ export function SearchPage(
   return () => {
     const { query, results, error } = handle.props;
     return (
-      <Layout title="Add Show">
+      <Layout title="Add Show" active="add">
         <DesktopTitle class="mb-4">Add Show</DesktopTitle>
         <form method="GET" class="flex flex-col sm:flex-row gap-2 mb-6">
           <input
@@ -67,7 +67,7 @@ export function SearchPage(
             inputmode="search"
             autocomplete="off"
             autocapitalize="words"
-            class="input input-bordered flex-1"
+            class="input input-bordered flex-1 w-full"
           />
           <button class="btn btn-primary">Search</button>
         </form>

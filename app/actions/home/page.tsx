@@ -127,7 +127,7 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
   return () => {
     const d = handle.props.data;
     return (
-      <Layout title="Home">
+      <Layout title="Home" active="home">
         <div id="refresh-banner" class={`alert alert-info mb-4 ${d.refreshing.running ? "" : "hidden"}`} role="status">
           <span class="loading loading-spinner loading-sm"></span>
           <span id="refresh-banner-text">

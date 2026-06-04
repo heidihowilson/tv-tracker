@@ -51,7 +51,7 @@ export function ShowsPage(handle: Handle<{ items: ShowListItem[]; status?: ShowS
   return () => {
     const { items, status } = handle.props;
     return (
-      <Layout title={`All Shows (${items.length})`}>
+      <Layout title={`All Shows (${items.length})`} active="shows">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div class="flex items-baseline gap-3">
             <DesktopTitle>{`All Shows (${items.length})`}</DesktopTitle>

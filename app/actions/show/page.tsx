@@ -113,7 +113,7 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
         ? Math.round((progress.watched_episodes / progress.total_episodes) * 100)
         : 0;
     return (
-      <Layout title={show.title}>
+      <Layout title={show.title} active="shows">
         <div class="flex gap-4 mb-6">
           <PosterThumb src={imgSrc} title={show.title} class="w-20 h-30 sm:w-24 sm:h-36" />
           <div class="flex-1 min-w-0">

@@ -65,8 +65,18 @@ function Logo(handle: Handle<{ class?: string }>) {
   );
 }
 
-export function Layout(handle: Handle<{ title: string; action?: RemixNode; children?: RemixNode }>) {
-  return () => (
+/** Which primary-nav tab the current page belongs to (highlights it in both navs). */
+export type NavTab = "home" | "add" | "shows";
+
+export function Layout(handle: Handle<{ title: string; active?: NavTab; action?: RemixNode; children?: RemixNode }>) {
+  return () => {
+    const active = handle.props.active;
+    /** Bottom-nav link classes: the current tab is tinted, the rest muted. */
+    const tab = (key: NavTab) =>
+      active === key ? "text-primary font-semibold" : "text-base-content/60 hover:text-primary";
+    const current = (key: NavTab) => (active === key ? "page" : undefined);
+
+    return (
     <html lang="en" data-theme="abyss">
       <head>
         <meta charset="UTF-8" />
@@ -91,10 +101,18 @@ export function Layout(handle: Handle<{ title: string; action?: RemixNode; child
               <span class="text-base-content">TV Tracker</span>
             </a>
             <nav aria-label="Primary" class="flex gap-1">
-              <a href={routes.home.href()} class="btn btn-ghost btn-sm">
+              <a
+                href={routes.home.href()}
+                class={`btn btn-ghost btn-sm ${active === "home" ? "btn-active" : ""}`}
+                aria-current={current("home")}
+              >
                 Home
               </a>
-              <a href={routes.shows.href()} class="btn btn-ghost btn-sm">
+              <a
+                href={routes.shows.href()}
+                class={`btn btn-ghost btn-sm ${active === "shows" ? "btn-active" : ""}`}
+                aria-current={current("shows")}
+              >
                 All Shows
               </a>
             </nav>
@@ -118,7 +136,7 @@ export function Layout(handle: Handle<{ title: string; action?: RemixNode; child
 
         {/* Mobile bottom nav: Home / Add (primary) / All Shows. */}
         <nav aria-label="Primary" class="mobile-nav lg:hidden bg-base-200 border-t border-base-300">
-          <a href={routes.home.href()} class="text-base-content/70 hover:text-primary">
+          <a href={routes.home.href()} class={tab("home")} aria-current={current("home")}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-6 w-6"
@@ -136,7 +154,7 @@ export function Layout(handle: Handle<{ title: string; action?: RemixNode; child
             </svg>
             <span>Home</span>
           </a>
-          <a href={routes.search.href()} class="text-primary font-semibold">
+          <a href={routes.search.href()} class={tab("add")} aria-current={current("add")}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-7 w-7"
@@ -150,7 +168,7 @@ export function Layout(handle: Handle<{ title: string; action?: RemixNode; child
             </svg>
             <span>Add</span>
           </a>
-          <a href={routes.shows.href()} class="text-base-content/70 hover:text-primary">
+          <a href={routes.shows.href()} class={tab("shows")} aria-current={current("shows")}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-6 w-6"
@@ -167,5 +185,6 @@ export function Layout(handle: Handle<{ title: string; action?: RemixNode; child
         <script src={staticUrl("app.js")}></script>
       </body>
     </html>
-  );
+    );
+  };
 }
