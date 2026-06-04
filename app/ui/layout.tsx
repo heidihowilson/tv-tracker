@@ -1,10 +1,14 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource remix/ui */
 /**
- * Shared app chrome: the full abyss-themed document with favicons, the
- * precompiled CSS link (cache-busted via CSS_VERSION), nav, and the external
- * client script. Client JS stays external because the ui renderer escapes inline
- * <script> text.
+ * Shared app chrome: the full document with favicons, the precompiled CSS link
+ * (cache-busted via CSS_VERSION), nav, and the external client script. Client
+ * JS stays external because the ui renderer escapes inline <script> text.
+ *
+ * Theme: the sethmakes system is dual light/dark via color-scheme +
+ * light-dark(), following the OS preference — no data-theme attribute, no
+ * toggle. Chrome surfaces are tonal (surface-1 over the page bg) with zero
+ * borders, per the design language.
  *
  * Mobile-first chrome (Phase 1): a contextual top bar (page title + optional
  * action) replaces the wasted centered-logo strip, and a 3-item bottom nav —
@@ -42,7 +46,7 @@ const NAV_STYLE = `
           transition: color 0.15s, background-color 0.15s;
           -webkit-tap-highlight-color: transparent;
         }
-        .mobile-nav a:active { background-color: var(--color-base-300); }
+        .mobile-nav a:active { background-color: var(--mk-color-surface-3); }
         /* Authoritative: keep the bottom bar off desktop. A bare lg:hidden utility
            loses to the .mobile-nav rule above on source order, so hide it here. */
         @media (min-width: 1024px) { .mobile-nav { display: none; } }
@@ -72,12 +76,14 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
   return () => {
     const active = handle.props.active;
     /** Bottom-nav link classes: the current tab is tinted, the rest muted. */
-    const tab = (key: NavTab) =>
-      active === key ? "text-primary font-semibold" : "text-base-content/60 hover:text-primary";
+    const tab = (key: NavTab) => (active === key ? "text-accent font-semibold" : "text-muted hover:text-accent");
     const current = (key: NavTab) => (active === key ? "page" : undefined);
+    /** Desktop-nav button: the current tab gets the tonal fill, the rest are ghosts. */
+    const navBtn = (key: NavTab) =>
+      `mk-btn mk-btn--sm no-underline ${active === key ? "" : "mk-btn--ghost text-muted"}`;
 
     return (
-    <html lang="en" data-theme="abyss">
+    <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -92,32 +98,27 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
         <link href={`${staticUrl("app.css")}?v=${CSS_VERSION}`} rel="stylesheet" type="text/css" />
         <style>{NAV_STYLE}</style>
       </head>
-      <body class="min-h-screen bg-base-100 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <body class="min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
         {/* Desktop top bar: logo + simplified nav + primary Add action. */}
-        <div class="hidden lg:block sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
+        <div class="hidden lg:block sticky top-0 z-40 bg-surface-1/95 backdrop-blur">
           <div class="container mx-auto max-w-6xl px-4 flex items-center h-14">
-            <a href={routes.home.href()} class="font-bold text-lg mr-8 flex items-center gap-2 text-primary">
+            <a
+              href={routes.home.href()}
+              class="font-bold text-lg mr-8 flex items-center gap-2 text-accent no-underline hover:no-underline"
+            >
               <Logo class="h-6 w-6" />
-              <span class="text-base-content">TV Tracker</span>
+              <span class="text-body">TV Tracker</span>
             </a>
             <nav aria-label="Primary" class="flex gap-1">
-              <a
-                href={routes.home.href()}
-                class={`btn btn-ghost btn-sm ${active === "home" ? "btn-active" : ""}`}
-                aria-current={current("home")}
-              >
+              <a href={routes.home.href()} class={navBtn("home")} aria-current={current("home")}>
                 Home
               </a>
-              <a
-                href={routes.shows.href()}
-                class={`btn btn-ghost btn-sm ${active === "shows" ? "btn-active" : ""}`}
-                aria-current={current("shows")}
-              >
+              <a href={routes.shows.href()} class={navBtn("shows")} aria-current={current("shows")}>
                 All Shows
               </a>
             </nav>
             <div class="ml-auto">
-              <a href={routes.search.href()} class="btn btn-primary btn-sm">
+              <a href={routes.search.href()} class="mk-btn mk-btn--primary mk-btn--sm no-underline">
                 + Add Show
               </a>
             </div>
@@ -125,7 +126,7 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
         </div>
 
         {/* Mobile top bar: contextual (page title + optional action), not a logo strip. */}
-        <header class="lg:hidden sticky top-0 z-40 bg-base-200/95 backdrop-blur border-b border-base-300">
+        <header class="lg:hidden sticky top-0 z-40 bg-surface-1/95 backdrop-blur">
           <div class="flex items-center gap-2 h-14 px-4">
             <h1 class="font-bold text-lg truncate flex-1">{handle.props.title}</h1>
             {handle.props.action ? <div class="shrink-0">{handle.props.action}</div> : ""}
@@ -135,7 +136,7 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
         <div class="container mx-auto px-3 py-4 max-w-6xl">{handle.props.children}</div>
 
         {/* Mobile bottom nav: Home / Add (primary) / All Shows. */}
-        <nav aria-label="Primary" class="mobile-nav lg:hidden bg-base-200 border-t border-base-300">
+        <nav aria-label="Primary" class="mobile-nav lg:hidden bg-surface-1">
           <a href={routes.home.href()} class={tab("home")} aria-current={current("home")}>
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -1,13 +1,14 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource remix/ui */
 /**
- * Poster thumbnail with a graceful fallback.
+ * Poster thumbnail with a graceful fallback, on the design system's mk-thumb.
  *
- * When a show has no image_url (common until a TVMaze refresh fills it in), the
- * old UI rendered a big empty dark box. This shows the title's initial on a
- * subtle gradient instead — identifiable and not a void. Pass the already
- * safeUrl()-checked src; sizing comes from the `class` prop so call sites stay in
- * control (and Tailwind sees the literal size classes there).
+ * When a show has no image_url (common until a TVMaze refresh fills it in),
+ * mk-thumb__fallback centers the title's initial on a tonal surface —
+ * identifiable and not a void. Pass the already safeUrl()-checked src; sizing
+ * comes from the `class` prop so call sites stay in control (and Tailwind sees
+ * the literal size classes there). The fallback glyph is sized down from the
+ * library's 3xl default — these thumbs run 36–96px wide.
  */
 import type { Handle } from "remix/ui";
 
@@ -16,14 +17,16 @@ export function PosterThumb(handle: Handle<{ src: string | null; title: string; 
     const { src, title } = handle.props;
     const cls = handle.props.class ?? "w-12 h-18";
     if (src) {
-      return <img src={src} alt="" class={`${cls} object-cover rounded-md shrink-0 bg-base-300`} loading="lazy" />;
+      return (
+        <div class={`mk-thumb shrink-0 ${cls}`}>
+          <img src={src} alt="" loading="lazy" />
+        </div>
+      );
     }
     const initial = title.trim().charAt(0).toUpperCase() || "?";
     return (
-      <div
-        class={`${cls} rounded-md shrink-0 bg-gradient-to-br from-base-300 to-base-200 flex items-center justify-center`}
-      >
-        <span class="text-base-content/30 font-bold text-xl select-none">{initial}</span>
+      <div class={`mk-thumb shrink-0 ${cls}`}>
+        <span class="mk-thumb__fallback text-xl select-none">{initial}</span>
       </div>
     );
   };
