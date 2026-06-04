@@ -24,23 +24,26 @@ function SearchResult(handle: Handle<{ result: SearchResultItem }>) {
   return () => {
     const r = handle.props.result;
     return (
-      <div class="flex gap-3 items-center p-3 bg-base-200 rounded-lg mb-2">
+      <div class="mk-card p-3 flex gap-3 items-center mb-2">
         <PosterThumb src={r.imageUrl || null} title={r.name} class="w-12 h-18" />
         <div class="flex-1 min-w-0">
           <strong class="text-sm">{r.name}</strong>
-          <div class="text-xs text-base-content/60">
+          <div class="text-xs text-muted">
             {r.service} · {r.status}
           </div>
         </div>
         <div class="shrink-0">
           {r.existingId ? (
-            <a href={routes.showDetail.href({ id: String(r.existingId) })} class="btn btn-ghost btn-sm">
+            <a
+              href={routes.showDetail.href({ id: String(r.existingId) })}
+              class="mk-btn mk-btn--ghost mk-btn--sm no-underline"
+            >
               View
             </a>
           ) : (
             <form method="POST" action={routes.api.add.href()}>
               <input type="hidden" name="tvmaze_id" value={String(r.tvmazeId)} />
-              <button class="btn btn-primary btn-sm">+ Add</button>
+              <button class="mk-btn mk-btn--primary mk-btn--sm">+ Add</button>
             </form>
           )}
         </div>
@@ -67,12 +70,19 @@ export function SearchPage(
             inputmode="search"
             autocomplete="off"
             autocapitalize="words"
-            class="input input-bordered flex-1 w-full"
+            class="mk-input flex-1 w-full"
           />
-          <button class="btn btn-primary">Search</button>
+          <button class="mk-btn mk-btn--primary">Search</button>
         </form>
         <div>
-          {error ? <p class="text-base-content/60">{`Search failed: ${error}`}</p> : ""}
+          {error ? (
+            <div class="mk-alert mk-alert--danger mb-4" role="alert">
+              <div class="mk-alert__title">Search failed</div>
+              {error}
+            </div>
+          ) : (
+            ""
+          )}
           {results ? results.map((r) => <SearchResult result={r} />) : ""}
         </div>
       </Layout>

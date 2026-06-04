@@ -32,13 +32,13 @@ function UpcomingCard(handle: Handle<{ ep: UpcomingEpisode }>) {
         <PosterThumb src={imgSrc} title={ep.show_title} class="w-14 h-20 sm:w-16 sm:h-24" />
         <div class="flex-1 min-w-0">
           <h3 class="font-semibold text-sm truncate">{ep.show_title}</h3>
-          <p class="text-xs text-base-content/60 truncate">
+          <p class="text-xs text-muted truncate">
             S{ep.season_number}E{ep.episode_number}
             {ep.episode_title ? ` · ${ep.episode_title}` : ""}
           </p>
           <div class="flex items-center gap-2 mt-1 flex-wrap">
             <RelativeDate date={ep.air_date} class="text-xs" />
-            {ep.service ? <span class="text-xs text-base-content/40">· {ep.service}</span> : ""}
+            {ep.service ? <span class="text-xs text-faint">· {ep.service}</span> : ""}
           </div>
         </div>
       </CardRow>
@@ -54,7 +54,7 @@ export function UpcomingPage(handle: Handle<{ data: UpcomingData }>) {
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
           <DesktopTitle>Upcoming Episodes</DesktopTitle>
           <form method="GET">
-            <select name="days" {...onChangeSubmit} class="select select-bordered">
+            <select name="days" {...onChangeSubmit} class="mk-select">
               {[7, 14, 30, 60].map((v) => (
                 <option value={String(v)} selected={d.days === v}>{`${v} days`}</option>
               ))}
@@ -62,12 +62,15 @@ export function UpcomingPage(handle: Handle<{ data: UpcomingData }>) {
           </form>
         </div>
         {d.empty ? (
-          <p class="text-base-content/60">No upcoming episodes</p>
+          <div class="mk-empty">
+            <div class="mk-empty__title">No upcoming episodes</div>
+            <p class="mk-empty__message">Nothing airing in this window. Try a wider one.</p>
+          </div>
         ) : (
           d.groups.map((g) => (
             <section class="mb-6">
-              <h3 class="text-base font-bold text-base-content/70 mb-3">
-                {g.label} <span class="text-base-content/40 font-normal">({g.eps.length})</span>
+              <h3 class="text-base font-bold text-muted mb-3">
+                {g.label} <span class="text-faint font-normal">({g.eps.length})</span>
               </h3>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {g.eps.map((ep) => (

@@ -33,7 +33,10 @@ const STATUSES: ShowStatus[] = ["watching", "completed", "queued", "dropped"];
 export function NotFoundPage(_handle: Handle<{}>) {
   return () => (
     <Layout title="Not Found">
-      <p class="text-base-content/60">Show not found</p>
+      <div class="mk-empty">
+        <div class="mk-empty__title">Show not found</div>
+        <p class="mk-empty__message">It may have been deleted, or the link is stale.</p>
+      </div>
     </Layout>
   );
 }
@@ -44,14 +47,14 @@ function EpisodeRow(handle: Handle<{ showId: number; seasonNumber: number; ep: E
     const { showId, seasonNumber, ep: e } = handle.props;
     return (
       <div
-        class={`episode-item flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-4 p-3 bg-base-300 rounded-lg ${e.watched ? "watched" : ""}`}
+        class={`episode-item flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-4 p-3 bg-surface-2 ${e.watched ? "watched" : ""}`}
         id={`ep-${seasonNumber}-${e.episode_number}`}
       >
         <span class="font-semibold text-sm min-w-[50px] md:min-w-[60px]">E{e.episode_number}</span>
         <span class="flex-1 min-w-[150px] text-sm">{e.title}</span>
         {e.air_date ? <RelativeDate date={e.air_date} class="text-sm whitespace-nowrap" /> : ""}
         <button
-          class={`btn btn-sm watch-btn ${e.watched ? "btn-ghost" : "btn-primary"}`}
+          class={`mk-btn mk-btn--sm watch-btn ${e.watched ? "mk-btn--ghost" : "mk-btn--primary"}`}
           data-show={String(showId)}
           data-season={String(seasonNumber)}
           data-episode={String(e.episode_number)}
@@ -71,33 +74,31 @@ function SeasonCard(handle: Handle<{ showId: number; season: Season; episodes: E
     const watchedCount = episodes.filter((e) => e.watched).length;
     const allWatched = watchedCount === episodes.length && episodes.length > 0;
     return (
-      <div class="card bg-base-200 shadow-sm mb-4">
-        <div class="card-body p-4">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <h3 class="card-title text-base">Season {season.season_number}</h3>
-            <div class="flex items-center gap-2">
-              <span class="text-base-content/60 text-sm watched-count">
-                {watchedCount}/{episodes.length} watched
-              </span>
-              {episodes.length > 0 ? (
-                <button
-                  class={`btn btn-xs season-watch-all-btn ${allWatched ? "btn-ghost" : "btn-outline btn-primary"}`}
-                  data-show={String(showId)}
-                  data-season={String(season.season_number)}
-                  data-watched={allWatched ? "1" : "0"}
-                >
-                  {allWatched ? "Unmark all" : "Mark all"}
-                </button>
-              ) : (
-                ""
-              )}
-            </div>
+      <div class="mk-card p-4 mb-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 class="text-base font-bold">Season {season.season_number}</h3>
+          <div class="flex items-center gap-2">
+            <span class="text-muted text-sm watched-count">
+              {watchedCount}/{episodes.length} watched
+            </span>
+            {episodes.length > 0 ? (
+              <button
+                class={`mk-btn mk-btn--sm season-watch-all-btn ${allWatched ? "mk-btn--ghost" : ""}`}
+                data-show={String(showId)}
+                data-season={String(season.season_number)}
+                data-watched={allWatched ? "1" : "0"}
+              >
+                {allWatched ? "Unmark all" : "Mark all"}
+              </button>
+            ) : (
+              ""
+            )}
           </div>
-          <div class="flex flex-col gap-2">
-            {episodes.map((e) => (
-              <EpisodeRow showId={showId} seasonNumber={season.season_number} ep={e} />
-            ))}
-          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          {episodes.map((e) => (
+            <EpisodeRow showId={showId} seasonNumber={season.season_number} ep={e} />
+          ))}
         </div>
       </div>
     );
@@ -120,17 +121,17 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
             <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
               <div>
                 <DesktopTitle class="text-xl">{show.title}</DesktopTitle>
-                <p class="text-sm text-base-content/60">
+                <p class="text-sm text-muted">
                   {show.service ?? "Unknown service"} · Added {show.added_at?.split("T")[0]}
                 </p>
               </div>
-              <StatusBadge status={show.status} size="" />
+              <StatusBadge status={show.status} />
             </div>
-            {show.notes ? <p class="text-base-content/60 text-sm mb-2">{show.notes}</p> : ""}
+            {show.notes ? <p class="text-muted text-sm mb-2">{show.notes}</p> : ""}
             <div class="flex flex-wrap gap-2">
               <form method="POST" action={routes.api.status.href()} class="inline">
                 <input type="hidden" name="show_id" value={String(show.id)} />
-                <select name="status" {...onChangeSubmit} class="select select-bordered">
+                <select name="status" {...onChangeSubmit} class="mk-select">
                   {STATUSES.map((st) => (
                     <option value={st} selected={show.status === st}>
                       {cap(st)}
@@ -140,49 +141,47 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
               </form>
               <form method="POST" action={routes.api.refresh.href()} class="inline">
                 <input type="hidden" name="show_id" value={String(show.id)} />
-                <button class="btn btn-ghost btn-sm">↻ Refresh</button>
+                <button class="mk-btn mk-btn--ghost mk-btn--sm">↻ Refresh</button>
               </form>
               <form method="POST" action={routes.api.delete.href()} class="inline delete-form">
                 <input type="hidden" name="show_id" value={String(show.id)} />
-                <button class="btn btn-ghost btn-sm text-error">🗑 Delete</button>
+                <button class="mk-btn mk-btn--ghost mk-btn--sm text-danger">🗑 Delete</button>
               </form>
             </div>
 
-            <details class="mt-3">
-              <summary class="text-sm text-base-content/60 cursor-pointer select-none">Edit notes &amp; service</summary>
-              <form method="POST" action={routes.api.update.href()} class="mt-2 flex flex-col gap-2 max-w-md">
-                <input type="hidden" name="show_id" value={String(show.id)} />
-                <input
-                  name="service"
-                  value={show.service ?? ""}
-                  placeholder="Service (e.g. Netflix)"
-                  class="input input-bordered w-full"
-                  autocomplete="off"
-                />
-                <textarea
-                  name="notes"
-                  placeholder="Notes"
-                  rows={3}
-                  class="textarea textarea-bordered w-full"
-                  value={show.notes ?? ""}
-                ></textarea>
-                <button class="btn btn-primary btn-sm self-start">Save</button>
-              </form>
+            <details class="mk-disclosure mt-3">
+              <summary class="text-sm select-none">Edit notes &amp; service</summary>
+              <div class="mk-disclosure__body">
+                <form method="POST" action={routes.api.update.href()} class="flex flex-col gap-2 max-w-md">
+                  <input type="hidden" name="show_id" value={String(show.id)} />
+                  <input
+                    name="service"
+                    value={show.service ?? ""}
+                    placeholder="Service (e.g. Netflix)"
+                    class="mk-input w-full"
+                    autocomplete="off"
+                  />
+                  <textarea
+                    name="notes"
+                    placeholder="Notes"
+                    rows={3}
+                    class="mk-textarea w-full min-h-24"
+                    value={show.notes ?? ""}
+                  ></textarea>
+                  <button class="mk-btn mk-btn--primary mk-btn--sm self-start">Save</button>
+                </form>
+              </div>
             </details>
           </div>
         </div>
         {progress && progress.total_episodes > 0 ? (
-          <div class="card bg-base-200 shadow-sm mb-4">
-            <div class="card-body p-4">
-              <p class="text-sm">{`Progress: ${progress.watched_episodes}/${progress.total_episodes} episodes (${pct}%)`}</p>
-              <WatchProgress watched={progress.watched_episodes} total={progress.total_episodes} class="mt-2" />
-            </div>
+          <div class="mk-card p-4 mb-4">
+            <p class="text-sm">{`Progress: ${progress.watched_episodes}/${progress.total_episodes} episodes (${pct}%)`}</p>
+            <WatchProgress watched={progress.watched_episodes} total={progress.total_episodes} class="mt-2" />
           </div>
         ) : (
-          <div class="card bg-base-200 shadow-sm mb-4">
-            <div class="card-body p-4">
-              <p class="text-base-content/60">No episode data yet — hit ↻ Refresh to pull from TVMaze</p>
-            </div>
+          <div class="mk-card p-4 mb-4">
+            <p class="text-muted">No episode data yet — hit ↻ Refresh to pull from TVMaze</p>
           </div>
         )}
         {seasons.map((s) => (

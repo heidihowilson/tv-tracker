@@ -15,19 +15,17 @@ import { DesktopTitle } from "../../ui/desktop-title.tsx";
 import { cap } from "../../utils/text.ts";
 import type { WatchHistoryEntry } from "../../data/schema.ts";
 
-/** Map an action to a DaisyUI badge color. */
+/** Map an action to an mk-badge variant (plain tonal = the quiet "unwatched"). */
 function actionBadge(action: WatchHistoryEntry["action"]): string {
   switch (action) {
     case "watched":
-      return "badge-success";
-    case "unwatched":
-      return "badge-ghost";
+      return "mk-badge--success";
     case "completed":
-      return "badge-primary";
+      return "mk-badge--accent";
     case "dropped":
-      return "badge-warning";
+      return "mk-badge--warning";
     default:
-      return "badge-ghost";
+      return "";
   }
 }
 
@@ -37,21 +35,21 @@ function HistoryRow(handle: Handle<{ entry: WatchHistoryEntry }>) {
     const epLabel =
       e.season_number != null && e.episode_number != null ? `S${e.season_number}E${e.episode_number}` : null;
     return (
-      <div class="flex flex-wrap items-center gap-2 md:gap-3 p-3 bg-base-200 rounded-lg">
-        <span class={`badge ${actionBadge(e.action)} badge-sm`}>{cap(e.action)}</span>
+      <div class="mk-card p-3 flex flex-wrap items-center gap-2 md:gap-3">
+        <span class={`mk-badge ${actionBadge(e.action)}`}>{cap(e.action)}</span>
         <span class="flex-1 min-w-[150px] text-sm">
           {e.show_id != null && e.show_title ? (
-            <a href={routes.showDetail.href({ id: String(e.show_id) })} class="link link-hover font-medium">
+            <a href={routes.showDetail.href({ id: String(e.show_id) })} class="font-medium">
               {e.show_title}
             </a>
           ) : (
-            <span class="text-base-content/60">(deleted show)</span>
+            <span class="text-muted">(deleted show)</span>
           )}
-          {epLabel ? <span class="text-base-content/60">{` · ${epLabel}`}</span> : ""}
-          {e.episode_title ? <span class="text-base-content/60">{` · ${e.episode_title}`}</span> : ""}
+          {epLabel ? <span class="text-muted">{` · ${epLabel}`}</span> : ""}
+          {e.episode_title ? <span class="text-muted">{` · ${e.episode_title}`}</span> : ""}
         </span>
         {/* RelativeDate normalizes the full timestamp to YYYY-MM-DD itself. */}
-        <RelativeDate date={e.watched_at} class="text-sm whitespace-nowrap text-base-content/50" />
+        <RelativeDate date={e.watched_at} class="text-sm whitespace-nowrap text-faint" />
       </div>
     );
   };
@@ -64,7 +62,10 @@ export function HistoryPage(handle: Handle<{ entries: WatchHistoryEntry[] }>) {
       <Layout title="History" active="shows">
         <DesktopTitle class="mb-4">Recently Watched</DesktopTitle>
         {entries.length === 0 ? (
-          <p class="text-base-content/60">No watch history yet.</p>
+          <div class="mk-empty">
+            <div class="mk-empty__title">No watch history yet</div>
+            <p class="mk-empty__message">Mark an episode watched and it will show up here.</p>
+          </div>
         ) : (
           <div class="flex flex-col gap-2">
             {entries.map((entry) => (

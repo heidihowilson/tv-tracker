@@ -37,22 +37,22 @@ function UnwatchedRow(handle: Handle<{ ep: UpcomingEpisode }>) {
     const ep = handle.props.ep;
     return (
       <div
-        class="episode-item flex items-center gap-3 p-3 bg-base-200 rounded-xl"
+        class="episode-item mk-card p-3 flex items-center gap-3"
         id={`dash-ep-${ep.show_id}-${ep.season_number}-${ep.episode_number}`}
       >
         <PosterThumb src={safeUrl(ep.image_url)} title={ep.show_title} class="w-11 h-16" />
         <div class="flex-1 min-w-0">
-          <a href={routes.showDetail.href({ id: String(ep.show_id) })} class="link link-hover font-semibold text-sm">
+          <a href={routes.showDetail.href({ id: String(ep.show_id) })} class="font-semibold text-sm">
             {ep.show_title}
           </a>
-          <div class="text-xs text-base-content/60 truncate">
+          <div class="text-xs text-muted truncate">
             S{ep.season_number}E{ep.episode_number}
             {ep.episode_title ? ` · ${ep.episode_title}` : ""}
           </div>
-          <RelativeDate date={ep.air_date} class="text-xs text-base-content/50" />
+          <RelativeDate date={ep.air_date} class="text-xs text-faint" />
         </div>
         <button
-          class="btn btn-primary watch-btn shrink-0"
+          class="mk-btn mk-btn--primary watch-btn shrink-0"
           data-show={String(ep.show_id)}
           data-season={String(ep.season_number)}
           data-episode={String(ep.episode_number)}
@@ -76,7 +76,7 @@ function ProgressCard(handle: Handle<{ progress: ShowProgress; show?: Show }>) {
         <PosterThumb src={safeUrl(show?.image_url)} title={p.title} class="w-12 h-18" />
         <div class="flex-1 min-w-0">
           <TitleBadgeRow title={p.title} status={p.status} />
-          <div class="text-xs text-base-content/60 truncate mt-0.5">
+          <div class="text-xs text-muted truncate mt-0.5">
             {meta}
             {p.next_episode ? (
               <>
@@ -112,12 +112,12 @@ function ComingSoonRow(handle: Handle<{ ep: UpcomingEpisode }>) {
         <PosterThumb src={safeUrl(ep.image_url)} title={ep.show_title} class="w-9 h-13" />
         <div class="flex-1 min-w-0">
           <div class="font-medium text-sm truncate">{ep.show_title}</div>
-          <div class="text-xs text-base-content/60 truncate">
+          <div class="text-xs text-muted truncate">
             S{ep.season_number}E{ep.episode_number}
             {ep.episode_title ? ` · ${ep.episode_title}` : ""}
           </div>
         </div>
-        <RelativeDate date={ep.air_date} class="text-xs text-base-content/50 shrink-0" />
+        <RelativeDate date={ep.air_date} class="text-xs text-faint shrink-0" />
       </CardRow>
     );
   };
@@ -128,8 +128,12 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
     const d = handle.props.data;
     return (
       <Layout title="Home" active="home">
-        <div id="refresh-banner" class={`alert alert-info mb-4 ${d.refreshing.running ? "" : "hidden"}`} role="status">
-          <span class="loading loading-spinner loading-sm"></span>
+        <div
+          id="refresh-banner"
+          class={`mk-alert mk-alert--info flex-row items-center gap-2 mb-4 ${d.refreshing.running ? "" : "hidden"}`}
+          role="status"
+        >
+          <span class="mk-spinner mk-spinner--sm"></span>
           <span id="refresh-banner-text">
             {d.refreshing.running ? `Refreshing ${d.refreshing.refreshed}/${d.refreshing.total || "…"}` : "Refreshing…"}
           </span>
@@ -137,7 +141,7 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
 
         <h2 class="text-lg font-bold mb-3">Up Next</h2>
         {d.unwatched.length === 0 ? (
-          <p class="text-base-content/60 mb-8">All caught up! 🎉</p>
+          <p class="text-muted mb-8">All caught up! 🎉</p>
         ) : (
           <div class="flex flex-col gap-2 mb-8">
             {d.unwatched.map((ep) => (
@@ -148,7 +152,13 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
 
         <h2 class="text-lg font-bold mb-3">Currently Watching</h2>
         {d.watching.length === 0 ? (
-          <p class="text-base-content/60">No shows being tracked</p>
+          <div class="mk-empty">
+            <div class="mk-empty__title">No shows yet</div>
+            <p class="mk-empty__message">Track a show and it will land here.</p>
+            <a href={routes.search.href()} class="mk-empty__action mk-btn mk-btn--primary no-underline">
+              + Add Show
+            </a>
+          </div>
         ) : (
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             {d.watching.map((item) => (
@@ -161,7 +171,7 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
           <section class="mt-8">
             <div class="flex items-center justify-between mb-3">
               <h2 class="text-lg font-bold">Coming Soon</h2>
-              <a href={routes.upcoming.href()} class="text-sm link link-hover text-primary">
+              <a href={routes.upcoming.href()} class="text-sm">
                 See all →
               </a>
             </div>
@@ -176,9 +186,10 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
         )}
 
         {/* Demoted maintenance action — quiet, at the bottom. */}
-        <div class="mt-10 pt-4 border-t border-base-300">
+        <div class="mt-10">
+          <hr class="mk-divider" />
           <form method="POST" action={routes.api.refreshAllPost.href()}>
-            <button id="refresh-all-btn" class="btn btn-ghost btn-sm text-base-content/50">
+            <button id="refresh-all-btn" class="mk-btn mk-btn--ghost mk-btn--sm text-faint">
               ↻ Refresh all show data
             </button>
           </form>
