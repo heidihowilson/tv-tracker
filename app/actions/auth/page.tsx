@@ -2,7 +2,8 @@
 /** @jsxImportSource remix/ui */
 /**
  * Magic-link interstitial (route-local). Owns its own minimal <html> document
- * (CSS link only, no nav, no app.js). Follows the OS light/dark preference.
+ * (CSS link only, no nav, no app.js). Pinned dark via data-theme like the
+ * rest of the app.
  */
 import type { Handle } from "remix/ui";
 import { CSS_VERSION } from "../render.tsx";
@@ -10,7 +11,7 @@ import { routes, staticUrl } from "../../routes.ts";
 
 export function AuthInterstitialPage(handle: Handle<{ token: string }>) {
   return () => (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />

@@ -2,8 +2,8 @@
 /** @jsxImportSource remix/ui */
 /**
  * Public landing gallery shown to unauthenticated visitors at "/". Owns its own
- * minimal <html> document (CSS link only, no nav, no app.js). Follows the OS
- * light/dark preference like the rest of the app.
+ * minimal <html> document (CSS link only, no nav, no app.js). Pinned dark via
+ * data-theme like the rest of the app.
  */
 import type { Handle } from "remix/ui";
 import { CSS_VERSION } from "../render.tsx";
@@ -55,7 +55,7 @@ export function LandingPage(handle: Handle<{ watching: LandingShow[]; completed:
   return () => {
     const { watching, completed } = handle.props;
     return (
-      <html lang="en">
+      <html lang="en" data-theme="dark">
         <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />

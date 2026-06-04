@@ -6,9 +6,10 @@
  * JS stays external because the ui renderer escapes inline <script> text.
  *
  * Theme: the sethmakes system is dual light/dark via color-scheme +
- * light-dark(), following the OS preference — no data-theme attribute, no
- * toggle. Chrome surfaces are tonal (surface-1 over the page bg) with zero
- * borders, per the design language.
+ * light-dark(); data-theme="dark" pins the app dark regardless of OS
+ * preference (drop the attribute to follow the OS instead). Chrome surfaces
+ * are tonal (surface-1 over the page bg) with zero borders, per the design
+ * language.
  *
  * Mobile-first chrome (Phase 1): a contextual top bar (page title + optional
  * action) replaces the wasted centered-logo strip, and a 3-item bottom nav —
@@ -83,7 +84,7 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
       `mk-btn mk-btn--sm no-underline ${active === key ? "" : "mk-btn--ghost text-muted"}`;
 
     return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
