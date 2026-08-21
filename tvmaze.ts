@@ -18,7 +18,14 @@ async function rateLimitedFetch(url: string, retries = 3): Promise<Response> {
   lastCall = Date.now();
   const response = await fetch(url);
   if (response.status === 429 && retries > 0) {
-    await new Promise((r) => setTimeout(r, 2 ** (4 - retries) * 500));
+    // Prefer the server's Retry-After (seconds) over blind backoff; cap it
+    // so a bogus header can't stall the app.
+    const retryAfter = Number(response.headers.get("retry-after"));
+    const waitMs =
+      Number.isFinite(retryAfter) && retryAfter > 0
+        ? Math.min(retryAfter * 1000, 15_000)
+        : 2 ** (4 - retries) * 500;
+    await new Promise((r) => setTimeout(r, waitMs));
     return rateLimitedFetch(url, retries - 1);
   }
   return response;
