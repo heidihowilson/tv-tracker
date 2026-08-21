@@ -9,14 +9,19 @@ const BASE_URL = "https://api.tvmaze.com";
 let lastCall = 0;
 const MIN_INTERVAL = 500; // 500ms between calls to be safe
 
-async function rateLimitedFetch(url: string): Promise<Response> {
+async function rateLimitedFetch(url: string, retries = 3): Promise<Response> {
   const now = Date.now();
   const elapsed = now - lastCall;
   if (elapsed < MIN_INTERVAL) {
     await new Promise((r) => setTimeout(r, MIN_INTERVAL - elapsed));
   }
   lastCall = Date.now();
-  return fetch(url);
+  const response = await fetch(url);
+  if (response.status === 429 && retries > 0) {
+    await new Promise((r) => setTimeout(r, 2 ** (4 - retries) * 500));
+    return rateLimitedFetch(url, retries - 1);
+  }
+  return response;
 }
 
 export interface TvMazeShow {
@@ -159,5 +164,6 @@ export function getService(show: TvMazeShow): string | null {
  */
 export async function findShow(query: string): Promise<SearchResult | null> {
   const results = await searchShows(query);
-  return results.length > 0 ? results[0] : null;
+  if (results.length === 0) return null;
+  return results.sort((a, b) => a.score - b.score)[0];
 }
