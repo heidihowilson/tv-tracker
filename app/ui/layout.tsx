@@ -5,11 +5,9 @@
  * (cache-busted via CSS_VERSION), nav, and the external client script. Client
  * JS stays external because the ui renderer escapes inline <script> text.
  *
- * Theme: the sethmakes system is dual light/dark via color-scheme +
- * light-dark(); data-theme="dark" pins the app dark regardless of OS
- * preference (drop the attribute to follow the OS instead). Chrome surfaces
- * are tonal (surface-1 over the page bg) with zero borders, per the design
- * language.
+ * Theme: the sethmakes system (0.2+, Vaudeville) is single-mode — the printed
+ * sheet is the mode, there is no dark variant and no data-theme attribute.
+ * Chrome surfaces are tonal (inset paper over the sheet) with zero borders.
  *
  * Mobile-first chrome (Phase 1): a contextual top bar (page title + optional
  * action) replaces the wasted centered-logo strip, and a 3-item bottom nav —
@@ -44,10 +42,9 @@ const NAV_STYLE = `
           min-height: 56px;
           text-decoration: none;
           font-size: 11px;
-          transition: color 0.15s, background-color 0.15s;
           -webkit-tap-highlight-color: transparent;
         }
-        .mobile-nav a:active { background-color: var(--mk-color-surface-3); }
+        .mobile-nav a:active { background-color: var(--mk-color-plate); }
         /* Authoritative: keep the bottom bar off desktop. A bare lg:hidden utility
            loses to the .mobile-nav rule above on source order, so hide it here. */
         @media (min-width: 1024px) { .mobile-nav { display: none; } }
@@ -84,7 +81,7 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
       `mk-btn mk-btn--sm no-underline ${active === key ? "" : "mk-btn--ghost text-muted"}`;
 
     return (
-    <html lang="en" data-theme="dark">
+    <html lang="en">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -101,14 +98,16 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
       </head>
       <body class="min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
         {/* Desktop top bar: logo + simplified nav + primary Add action. */}
-        <div class="hidden lg:block sticky top-0 z-40 bg-surface-1/95 backdrop-blur">
+        {/* Opaque inset paper: Vaudeville retired translucent chrome (nothing
+            in the language blurs or floats), so no /95 alpha, no backdrop-blur. */}
+        <div class="hidden lg:block sticky top-0 z-40 bg-inset">
           <div class="container mx-auto max-w-6xl px-4 flex items-center h-14">
             <a
               href={routes.home.href()}
               class="font-bold text-lg mr-8 flex items-center gap-2 text-accent no-underline hover:no-underline"
             >
               <Logo class="h-6 w-6" />
-              <span class="text-body">TV Tracker</span>
+              <span class="text-text">TV Tracker</span>
             </a>
             <nav aria-label="Primary" class="flex gap-1">
               <a href={routes.home.href()} class={navBtn("home")} aria-current={current("home")}>
@@ -127,7 +126,7 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
         </div>
 
         {/* Mobile top bar: contextual (page title + optional action), not a logo strip. */}
-        <header class="lg:hidden sticky top-0 z-40 bg-surface-1/95 backdrop-blur">
+        <header class="lg:hidden sticky top-0 z-40 bg-inset">
           <div class="flex items-center gap-2 h-14 px-4">
             <h1 class="font-bold text-lg truncate flex-1">{handle.props.title}</h1>
             {handle.props.action ? <div class="shrink-0">{handle.props.action}</div> : ""}
@@ -137,7 +136,7 @@ export function Layout(handle: Handle<{ title: string; active?: NavTab; action?:
         <div class="container mx-auto px-3 py-4 max-w-6xl">{handle.props.children}</div>
 
         {/* Mobile bottom nav: Home / Add (primary) / All Shows. */}
-        <nav aria-label="Primary" class="mobile-nav lg:hidden bg-surface-1">
+        <nav aria-label="Primary" class="mobile-nav lg:hidden bg-inset">
           <a href={routes.home.href()} class={tab("home")} aria-current={current("home")}>
             <svg
               xmlns="http://www.w3.org/2000/svg"

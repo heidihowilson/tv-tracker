@@ -49,7 +49,7 @@ function UnwatchedRow(handle: Handle<{ ep: UpcomingEpisode }>) {
             S{ep.season_number}E{ep.episode_number}
             {ep.episode_title ? ` · ${ep.episode_title}` : ""}
           </div>
-          <RelativeDate date={ep.air_date} class="text-xs text-faint" />
+          <RelativeDate date={ep.air_date} class="text-xs text-muted" />
         </div>
         <button
           class="mk-btn mk-btn--primary watch-btn shrink-0"
@@ -117,7 +117,7 @@ function ComingSoonRow(handle: Handle<{ ep: UpcomingEpisode }>) {
             {ep.episode_title ? ` · ${ep.episode_title}` : ""}
           </div>
         </div>
-        <RelativeDate date={ep.air_date} class="text-xs text-faint shrink-0" />
+        <RelativeDate date={ep.air_date} class="text-xs text-muted shrink-0" />
       </CardRow>
     );
   };
@@ -189,7 +189,7 @@ export function DashboardPage(handle: Handle<{ data: DashboardData }>) {
         <div class="mt-10">
           <hr class="mk-divider" />
           <form method="POST" action={routes.api.refreshAllPost.href()}>
-            <button id="refresh-all-btn" class="mk-btn mk-btn--ghost mk-btn--sm text-faint">
+            <button id="refresh-all-btn" class="mk-btn mk-btn--ghost mk-btn--sm text-muted">
               ↻ Refresh all show data
             </button>
           </form>

@@ -13,6 +13,11 @@
 @import "@sethmakes/tokens/index.css";
 @import "@sethmakes/tokens/fonts.css";
 @import "@sethmakes/css/index.css";
+/* The system's own Tailwind v4 @theme bridge (bg-sheet, bg-inset, bg-plate,
+   text-muted, text-accent, border-rule, font-typewriter, …). Replaces the
+   hand-rolled mapping this file carried on 0.1.x; must come after the token
+   sheet so every var(--mk-*) it references resolves. */
+@import "@sethmakes/tokens/tailwind.css";
 
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
@@ -26,22 +31,6 @@
    stylesheet vanishes. */
 @source "../app/**/*.tsx";
 @source "../public/static/app.js";
-
-/* Bridge mk semantic tokens into Tailwind color utilities (text-muted,
-   bg-surface-2, hover:text-accent, …). Components use mk- classes; these
-   exist for the layout-utility layer the app keeps. */
-@theme {
-  --color-body: var(--mk-color-text);
-  --color-accent: var(--mk-color-accent);
-  --color-success: var(--mk-color-success);
-  --color-warning: var(--mk-color-warning);
-  --color-danger: var(--mk-color-danger);
-  --color-muted: var(--mk-color-text-muted);
-  --color-faint: var(--mk-color-text-faint);
-  --color-surface-1: var(--mk-color-surface-1);
-  --color-surface-2: var(--mk-color-surface-2);
-  --color-surface-3: var(--mk-color-surface-3);
-}
 
 /* What we still need from preflight (not imported, see header): the views
    space everything with mb-N and gap-N utilities and assume zero default
