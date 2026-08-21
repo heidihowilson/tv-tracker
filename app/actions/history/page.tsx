@@ -49,7 +49,7 @@ function HistoryRow(handle: Handle<{ entry: WatchHistoryEntry }>) {
           {e.episode_title ? <span class="text-muted">{` · ${e.episode_title}`}</span> : ""}
         </span>
         {/* RelativeDate normalizes the full timestamp to YYYY-MM-DD itself. */}
-        <RelativeDate date={e.watched_at} class="text-sm whitespace-nowrap text-faint" />
+        <RelativeDate date={e.watched_at} class="text-sm whitespace-nowrap text-muted" />
       </div>
     );
   };

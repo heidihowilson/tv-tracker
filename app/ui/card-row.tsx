@@ -16,7 +16,7 @@ export function CardRow(handle: Handle<{ href: string; class?: string; children?
   return () => (
     <a
       href={handle.props.href}
-      class={`mk-card p-3 flex items-center gap-3 text-inherit hover:text-inherit no-underline hover:no-underline hover:bg-surface-2 active:bg-surface-2 transition-colors ${handle.props.class ?? ""}`}
+      class={`mk-card p-3 flex items-center gap-3 text-inherit hover:text-inherit no-underline hover:no-underline hover:bg-plate active:bg-plate ${handle.props.class ?? ""}`}
     >
       {handle.props.children}
     </a>

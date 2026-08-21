@@ -38,7 +38,7 @@ function UpcomingCard(handle: Handle<{ ep: UpcomingEpisode }>) {
           </p>
           <div class="flex items-center gap-2 mt-1 flex-wrap">
             <RelativeDate date={ep.air_date} class="text-xs" />
-            {ep.service ? <span class="text-xs text-faint">· {ep.service}</span> : ""}
+            {ep.service ? <span class="text-xs text-muted">· {ep.service}</span> : ""}
           </div>
         </div>
       </CardRow>
@@ -70,7 +70,7 @@ export function UpcomingPage(handle: Handle<{ data: UpcomingData }>) {
           d.groups.map((g) => (
             <section class="mb-6">
               <h3 class="text-base font-bold text-muted mb-3">
-                {g.label} <span class="text-faint font-normal">({g.eps.length})</span>
+                {g.label} <span class="text-muted font-normal">({g.eps.length})</span>
               </h3>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {g.eps.map((ep) => (

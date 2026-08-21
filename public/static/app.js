@@ -24,13 +24,13 @@ function formatDates() {
     const d = el.dataset.date;
     el.textContent = relativeDate(d);
     el.title = d; // tooltip shows actual date
-    el.classList.remove('text-faint', 'text-accent', 'font-semibold', 'text-warning');
+    el.classList.remove('text-muted', 'text-accent', 'font-semibold', 'text-warning');
     if (d === today) {
       el.classList.add('text-accent', 'font-semibold');
     } else if (d > today) {
       el.classList.add('text-warning');
     } else {
-      el.classList.add('text-faint');
+      el.classList.add('text-muted');
     }
   });
 }

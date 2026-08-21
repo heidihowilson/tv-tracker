@@ -47,7 +47,7 @@ function EpisodeRow(handle: Handle<{ showId: number; seasonNumber: number; ep: E
     const { showId, seasonNumber, ep: e } = handle.props;
     return (
       <div
-        class={`episode-item flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-4 p-3 bg-surface-2 ${e.watched ? "watched" : ""}`}
+        class={`episode-item flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-4 p-3 bg-plate ${e.watched ? "watched" : ""}`}
         id={`ep-${seasonNumber}-${e.episode_number}`}
       >
         <span class="font-semibold text-sm min-w-[50px] md:min-w-[60px]">E{e.episode_number}</span>

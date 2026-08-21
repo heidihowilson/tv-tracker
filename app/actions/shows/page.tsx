@@ -28,7 +28,7 @@ function ShowRow(handle: Handle<{ item: ShowListItem }>) {
     return (
       <a
         href={routes.showDetail.href({ id: String(s.id) })}
-        class="show-row mk-card p-3 flex items-center gap-3 text-inherit hover:text-inherit no-underline hover:no-underline hover:bg-surface-2 active:bg-surface-2 transition-colors"
+        class="show-row mk-card p-3 flex items-center gap-3 text-inherit hover:text-inherit no-underline hover:no-underline hover:bg-plate active:bg-plate"
         data-title={s.title.toLowerCase()}
       >
         <PosterThumb src={safeUrl(s.image_url)} title={s.title} class="poster w-12 h-18" />
