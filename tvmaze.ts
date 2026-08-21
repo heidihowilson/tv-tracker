@@ -165,5 +165,5 @@ export function getService(show: TvMazeShow): string | null {
 export async function findShow(query: string): Promise<SearchResult | null> {
   const results = await searchShows(query);
   if (results.length === 0) return null;
-  return results.sort((a, b) => a.score - b.score)[0];
+  return results.sort((a, b) => b.score - a.score)[0];
 }
