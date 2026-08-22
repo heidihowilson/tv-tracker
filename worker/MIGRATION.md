@@ -1,10 +1,19 @@
 # Cutover runbook: Coolify/Bun → celld (Durable Objects)
 
-Status: **stub** — the celld runtime ships in this branch; fleet provisioning
-happens on the celld node separately (bucket → scoped credential →
-`/etc/celld/<fleet>.env` → `celld-<fleet>.service` on a free port → bare repo +
-post-receive hook → tunnel ingress → DNS). Until cutover, the Bun/Coolify
-deployment stays authoritative and untouched.
+Status: **fleet live, DNS flip pending.** Provisioned 2026-08-21 on celld-1
+(CT 113): bucket `tv-tracker`, scoped user/policy `tv-tracker-rw`,
+`/etc/celld/tv-tracker.env`, `celld-tv-tracker.service` on port 8088 with the
+tincan-style memory drop-in (MemoryHigh=768M/MemoryMax=1G). Version
+`4712ee84f2269fdd` deployed via `celld-release`; smoke-tested on the node:
+`/` and `/health` 200 through the DO, admin import of a 7-show dump succeeded,
+and data survived `systemctl restart` (recovered in 2 s). No bare repo yet —
+deploys run `celld-release deploy` directly, like the design/sprites fleets.
+
+Remaining before DNS moves: copy prod `AUTH_TOKEN`/`API_KEY` from the Coolify
+env into `/etc/celld/tv-tracker.env` (placeholders live there now), re-import
+a fresh dump of the live tracker.db, add the tunnel ingress + proxied CNAME,
+then prove the cutover with a stop-test. The Bun/Coolify deployment stays
+authoritative until then.
 
 ## What runs where
 
