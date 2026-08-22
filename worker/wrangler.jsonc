@@ -1,0 +1,38 @@
+// Worker manifest for the celld runtime (celld rejects wrangler.toml — jsonc only).
+//
+// build-worker.sh copies this file into dist/ next to worker.js and assets/,
+// so every path below is relative to the assembled dist/ directory that
+// `celld-release deploy dist` uploads.
+//
+// NO `vars` block, on purpose: manifest vars land in the fleet bucket as
+// plaintext. Secrets arrive as process env on the celld node instead
+// (CELLD_VAR_AUTH_TOKEN / CELLD_VAR_API_KEY / CELLD_VAR_ADMIN_TOKEN in
+// /etc/celld/<fleet>.env, mode 600) and surface here as env.AUTH_TOKEN etc.
+{
+  "name": "tv-tracker",
+  "main": "worker.js",
+  "compatibility_date": "2025-08-01",
+  "assets": {
+    "directory": "./assets",
+    "binding": "ASSETS",
+    // "none" — measured on celld v0.1.0/v0.2.1: nested directory indexes 404
+    // and no html_handling value serves both "/" and "*.html". This app never
+    // serves HTML from assets: every page (including "/") is rendered by the
+    // TrackerDO, and dist/assets holds only /static/* and /favicon.ico.
+    "html_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TRACKER",
+        "class_name": "TrackerDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TrackerDO"]
+    }
+  ]
+}

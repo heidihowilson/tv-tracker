@@ -8,3 +8,8 @@ public/static/app.css
 # Copied at build time from @sethmakes/tokens (the compiled CSS references
 # them relatively as ./fonts/*.woff2)
 public/static/fonts/
+
+# celld/Workers build output (assembled by build-worker.sh)
+dist/
+# wrangler dev local state
+.wrangler/

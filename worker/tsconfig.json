@@ -1,0 +1,13 @@
+{
+  // Typechecks the Worker entry, DO, shims, and smoke test together with the
+  // app modules they bundle. Separate from the root tsconfig so the Bun path's
+  // `npm run typecheck` is untouched. Run with: npm run typecheck:worker
+  "extends": "../tsconfig.json",
+  "include": [
+    "**/*.ts",
+    "../app/**/*.ts",
+    "../app/**/*.tsx",
+    "../tvmaze.ts",
+    "../tracker.ts"
+  ]
+}

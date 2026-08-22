@@ -10,7 +10,11 @@
     "serve": "npm run build:css && tsx server.ts",
     "dev": "npm run build:css && tsx watch server.ts",
     "test:e2e": "tsx e2e.spec.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build:worker": "./build-worker.sh",
+    "typecheck:worker": "tsc --noEmit -p worker/tsconfig.json",
+    "test:worker": "npm run build:worker && tsx worker/smoke.ts",
+    "dump:db": "tsx scripts/dump-tracker-db.ts"
   },
   "dependencies": {
     "@sethmakes/css": "^0.3.0",
@@ -23,6 +27,7 @@
     "@tailwindcss/cli": "^4.3.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
+    "esbuild": "^0.28.2",
     "playwright": "^1.60.0",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.19.2",
