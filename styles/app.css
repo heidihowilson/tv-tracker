@@ -62,7 +62,24 @@
   .mk-thumb--compact {
     border-width: 1px;
     padding: 2px;
-    box-shadow: 2px 2px 0 rgba(42, 36, 27, 0.2);
+    /* --mk-shadow-block is a composite token with the 4px offset baked in, so a
+       half-scale shadow can't reuse it directly — but it can still derive its
+       ink from the same token the library mixes, instead of hardcoding the
+       literal, so a retheme carries through. */
+    box-shadow: 2px 2px 0 color-mix(in srgb, var(--mk-ink, #2a241b) 20%, transparent);
+  }
+
+  /* The art window inside an mk-thumb frame: everything laid over the picture
+     (scrim, caption) positions against this, never against the frame edge, so
+     the printed mat stays clean. Written as a class rather than a Tailwind
+     arbitrary value because `inset-[var(--mk-frame-pad,6px)]` does not survive
+     Tailwind's class scanner — the comma in the fallback silently drops the
+     rule, which is exactly the failure it was meant to guard against.
+     The fallback matters: an unresolved var makes `inset` compute to `auto`,
+     which collapses the scrim to zero and ships the captions unreadable. */
+  .mk-thumb-art-window {
+    position: absolute;
+    inset: var(--mk-frame-pad, 6px);
   }
 
   /* Type laid over art (the public landing gallery).
