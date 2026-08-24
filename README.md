@@ -88,3 +88,5 @@ Data stored in `tracker.db` (SQLite).
 - `PORT` - Web server port (default: 8000)
 
 <!-- Ethos Gym app-mode smoke test: check runs gate this PR -->
+
+<!-- review model smoke -->
