@@ -143,6 +143,9 @@ function cssVersion(): string {
   ok("re-import without ?mode=replace is 409", (await post(JSON.stringify(dump), ADMIN_TOKEN)).status === 409);
   const replay = await post(JSON.stringify(dump), ADMIN_TOKEN, "?mode=replace");
   ok("re-import with ?mode=replace succeeds", replay.status === 200);
+  // The spelling that silently 409'd in prod and left stale (imageless) data.
+  const replay1 = await post(JSON.stringify(dump), ADMIN_TOKEN, "?replace=1");
+  ok("re-import with ?replace=1 also succeeds", replay1.status === 200, replay1);
 }
 
 // Machine API: key required, then real data from the imported DB.
