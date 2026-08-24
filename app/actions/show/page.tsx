@@ -116,7 +116,8 @@ export function ShowDetailPage(handle: Handle<{ data: ShowDetailData }>) {
     return (
       <Layout title={show.title} active="shows">
         <div class="flex gap-4 mb-6">
-          <PosterThumb src={imgSrc} title={show.title} class="w-20 h-30 sm:w-24 sm:h-36" />
+          {/* The one display-sized poster in the app: keeps the full library frame. */}
+          <PosterThumb src={imgSrc} title={show.title} class="w-20 h-30 sm:w-24 sm:h-36" compact={false} />
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
               <div>

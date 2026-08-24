@@ -44,3 +44,67 @@
     margin: 0;
   }
 }
+
+/* App-local extensions to the design system. Both of these exist because the
+   library's art vocabulary assumes display-sized art printed on paper, and
+   this app also uses postage-stamp thumbs and lays type over photographs.
+   Neither case has a documented modifier upstream yet; if these prove out,
+   they belong in @sethmakes/css rather than here. */
+@layer components {
+  /* Compact art frame.
+     mk-thumb frames art with a 2px rule + 6px mat + 4px block shadow — 8px of
+     chrome per side, fixed. That reads correctly at 96px; at list-thumb sizes
+     it swallows the picture. Measured on the live app before this change:
+     a w-11 h-16 thumb rendered a 44x64 box around 28x42 of art (36% frame),
+     and w-12 h-18 gave 48x72 around 32x48 (33% frame).
+     Scaling the frame with the art keeps the letterpress language intact
+     while letting the poster actually be the poster. */
+  .mk-thumb--compact {
+    border-width: 1px;
+    padding: 2px;
+    /* --mk-shadow-block is a composite token with the 4px offset baked in, so a
+       half-scale shadow can't reuse it directly — but it can still derive its
+       ink from the same token the library mixes, instead of hardcoding the
+       literal, so a retheme carries through. */
+    box-shadow: 2px 2px 0 color-mix(in srgb, var(--mk-ink, #2a241b) 20%, transparent);
+  }
+
+  /* The art window inside an mk-thumb frame: everything laid over the picture
+     (scrim, caption) positions against this, never against the frame edge, so
+     the printed mat stays clean. Written as a class rather than a Tailwind
+     arbitrary value because `inset-[var(--mk-frame-pad,6px)]` does not survive
+     Tailwind's class scanner — the comma in the fallback silently drops the
+     rule, which is exactly the failure it was meant to guard against.
+     The fallback matters: an unresolved var makes `inset` compute to `auto`,
+     which collapses the scrim to zero and ships the captions unreadable. */
+  .mk-thumb-art-window {
+    position: absolute;
+    inset: var(--mk-frame-pad, 6px);
+  }
+
+  /* Type laid over art (the public landing gallery).
+     The system has no on-image type scale — every colour token assumes ink on
+     newsprint — so an overlay has to bring its own contrast. mk-badge--accent
+     in particular is transparent with ink-coloured text, which disappears
+     completely against a photograph. */
+  .mk-badge--on-art {
+    background: rgba(18, 15, 11, 0.82);
+    border-color: rgba(255, 255, 255, 0.55);
+    color: #fff;
+    backdrop-filter: blur(2px);
+  }
+
+  /* The on-art plate flattens every badge to the same colour, so the accent
+     state re-earns its ochre rule here — "watching" and "finished" still have
+     to read differently at a glance. */
+  .mk-badge--on-art.mk-badge--accent {
+    border-color: var(--mk-color-accent);
+    color: #fff;
+  }
+
+  /* Keeps the title legible over the bright patches of a poster without
+     resorting to a heavier scrim that would hide the art. */
+  .mk-on-art-text {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  }
+}

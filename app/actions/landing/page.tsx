@@ -27,23 +27,39 @@ function LandingCard(handle: Handle<{ item: LandingShow }>) {
     return (
       <a href={tvmazeUrl} target="_blank" rel="noopener" class="no-underline hover:no-underline">
         <div class="mk-thumb transition-transform duration-300 hover:scale-[1.03]">
+          {/* alt="" — the caption below names the show, so alt text would just
+              repeat it to a screen reader. */}
           {imgSrc ? (
-            <img src={imgSrc} alt={show.title} loading="lazy" />
+            <img src={imgSrc} alt="" loading="lazy" />
           ) : (
             <span class="mk-thumb__fallback">{show.title.trim().charAt(0).toUpperCase() || "?"}</span>
           )}
-          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-          <div class="absolute bottom-0 left-0 right-0 p-3">
-            <h3 class="font-bold text-white text-sm leading-tight">{show.title}</h3>
-            <div class="flex items-center gap-2 mt-1">
-              {isDone ? (
-                <span class="mk-badge mk-badge--success">Finished</span>
+          {/* One box over the art holds BOTH the scrim and the caption, so they
+              cannot drift apart: mk-thumb's mat is part of the printed frame,
+              and neither a tint nor a line of type belongs on it. */}
+          <div class="mk-thumb-art-window">
+            {/* Heavier than a decorative gradient: poster art is frequently
+                bright exactly where the caption sits. */}
+            <div
+              class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent"
+              aria-hidden="true"
+            ></div>
+            <div class="absolute bottom-0 left-0 right-0 p-3 pb-2">
+              <h3 class="mk-on-art-text font-bold text-white text-sm leading-tight">{show.title}</h3>
+              <div class="flex items-center gap-2 mt-1">
+                {isDone ? (
+                  <span class="mk-badge mk-badge--on-art">Finished</span>
+                ) : (
+                  <span class="mk-badge mk-badge--on-art mk-badge--accent">Watching</span>
+                )}
+                {progress ? <span class="mk-on-art-text text-xs text-white/85">{progress}</span> : ""}
+              </div>
+              {show.service ? (
+                <span class="mk-on-art-text text-xs text-white/75">{show.service}</span>
               ) : (
-                <span class="mk-badge mk-badge--accent">Watching</span>
+                ""
               )}
-              {progress ? <span class="text-xs text-white/60">{progress}</span> : ""}
             </div>
-            {show.service ? <span class="text-xs text-white/40">{show.service}</span> : ""}
           </div>
         </div>
       </a>
