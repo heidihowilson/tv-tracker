@@ -32,18 +32,29 @@ function LandingCard(handle: Handle<{ item: LandingShow }>) {
           ) : (
             <span class="mk-thumb__fallback">{show.title.trim().charAt(0).toUpperCase() || "?"}</span>
           )}
-          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-          <div class="absolute bottom-0 left-0 right-0 p-3">
-            <h3 class="font-bold text-white text-sm leading-tight">{show.title}</h3>
+          {/* Scrim and caption inset to the art, not the frame: mk-thumb's 6px
+              mat is part of the printed frame and must not be tinted. The ramp
+              is heavier than a decorative gradient because poster art is
+              frequently bright exactly where the caption sits. */}
+          <div
+            class="absolute inset-[var(--mk-frame-pad)] bg-gradient-to-t from-black/90 via-black/55 to-transparent"
+            aria-hidden="true"
+          ></div>
+          <div class="absolute bottom-0 left-0 right-0 p-3 pb-2">
+            <h3 class="mk-on-art-text font-bold text-white text-sm leading-tight">{show.title}</h3>
             <div class="flex items-center gap-2 mt-1">
               {isDone ? (
-                <span class="mk-badge mk-badge--success">Finished</span>
+                <span class="mk-badge mk-badge--on-art">Finished</span>
               ) : (
-                <span class="mk-badge mk-badge--accent">Watching</span>
+                <span class="mk-badge mk-badge--on-art mk-badge--accent">Watching</span>
               )}
-              {progress ? <span class="text-xs text-white/60">{progress}</span> : ""}
+              {progress ? <span class="mk-on-art-text text-xs text-white/85">{progress}</span> : ""}
             </div>
-            {show.service ? <span class="text-xs text-white/40">{show.service}</span> : ""}
+            {show.service ? (
+              <span class="mk-on-art-text text-xs text-white/75">{show.service}</span>
+            ) : (
+              ""
+            )}
           </div>
         </div>
       </a>
