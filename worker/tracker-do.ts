@@ -28,6 +28,17 @@
 import { constantTimeEqual } from "./shims/constant-time.ts";
 import { parseDump, importDump, hasData, DUMP_FORMAT } from "./import.ts";
 
+/**
+ * True when the request asks to overwrite existing data. Honors the canonical
+ * `?mode=replace` and the equally natural `?replace=1` / `?replace=true` /
+ * `?replace=yes`, so no reasonable spelling silently no-ops into a 409.
+ */
+export function wantsReplace(params: URLSearchParams): boolean {
+  if (params.get("mode") === "replace") return true;
+  const r = params.get("replace");
+  return r !== null && ["1", "true", "yes", "replace", ""].includes(r.toLowerCase());
+}
+
 type AppRouter = { fetch(request: Request): Promise<Response> };
 
 export class TrackerDO {
@@ -142,7 +153,11 @@ export class TrackerDO {
     await this.#getRouter();
 
     const sql = this.#ctx.storage.sql;
-    const replace = url.searchParams.get("mode") === "replace";
+    // Accept every natural spelling of the replace intent. The canonical form is
+    // ?mode=replace, but ?replace=1 / ?replace=true read identically to an
+    // operator and, when only one was honored, a replace-import silently 409'd
+    // and left stale data in place (a migration that looks done but isn't).
+    const replace = wantsReplace(url.searchParams);
     if (!replace && hasData(sql)) {
       return Response.json(
         { error: "database already has shows; re-run with ?mode=replace to overwrite" },

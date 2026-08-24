@@ -70,7 +70,8 @@ curl -sS -X POST "https://<fleet-host>/admin/import" \
   --data-binary @dump.json
 ```
 
-- Refuses (409) if the DO already has shows; `?mode=replace` wipes and
+- Refuses (409) if the DO already has shows; `?mode=replace` (also
+  `?replace=1`/`true`/`yes`) wipes and
   re-imports — also the correct recovery if an import failed partway.
 - Row ids are preserved, so `/show/:id` bookmarks and all FKs survive.
 - Verify: `GET /api/upcoming?key=$API_KEY` matches the old server's output;
