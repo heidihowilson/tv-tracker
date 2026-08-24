@@ -108,3 +108,7 @@
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   }
 }
+
+/* Smoke marker for the Gym's dependency-aware workspace: a pet should now be
+   able to open node_modules/@sethmakes/css/src/media.css and confirm that
+   .mk-thumb really does set padding: var(--mk-frame-pad). */
