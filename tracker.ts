@@ -195,8 +195,10 @@ export async function markWatchedThrough(showTitle: string, season: number, epis
     if (s.season_number > season) break;
 
     const eps = await db.getEpisodes(s.id);
-    for (const ep of eps) {
-      if (s.season_number === season && ep.episode_number > episode) break;
+    // Don't rely on getEpisodes() returning episodes in order — filter the
+    // final season down instead of breaking out of a loop mid-way.
+    const upTo = s.season_number === season ? eps.filter((ep) => ep.episode_number < episode) : eps;
+    for (const ep of upTo) {
       if (!ep.watched) {
         episodeIds.push(ep.id);
       }
