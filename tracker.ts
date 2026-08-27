@@ -181,6 +181,10 @@ export async function markWatched(
 /**
  * Mark all episodes up to a certain point as watched
  */
+/**
+ * Mark every episode up to AND INCLUDING season/episode as watched.
+ * The bound is inclusive — "watched through S2E5" means S2E5 is watched.
+ */
 export async function markWatchedThrough(showTitle: string, season: number, episode: number): Promise<boolean> {
   const show = await db.getShowByTitle(showTitle);
   if (!show) {
